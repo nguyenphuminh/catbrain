@@ -1,3 +1,3 @@
-const exports = require("./dist/core");
+const lib = require("./dist/core");
 
-module.exports = exports;
+module.exports = lib;
