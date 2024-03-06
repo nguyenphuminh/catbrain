@@ -1,19 +1,30 @@
+export interface CatBrainOptions {
+    inputAmount: number;
+    hiddenAmount: number;
+    outputAmount: number;
+    learningRate: number;
+}
+
 export class CatBrain {
     public weightsInputToHidden: number[][];
     public weightsHiddenToOutput: number[][];
     public biasHidden: number[];
     public biasOutput: number[];
     public hiddenLayer: number[];
+    public inputAmount: number;
+    public hiddenAmount: number;
+    public outputAmount: number;
+    public learningRate: number;
 
-    constructor(
-        public inputAmount: number = 2,
-        public hiddenAmount: number = 4,
-        public outputAmount: number = 6,
-        public learningRate: number = 0.03
-    ) {
+    constructor(options: CatBrainOptions) {
+        this.inputAmount = options.inputAmount;
+        this.hiddenAmount = options.hiddenAmount;
+        this.outputAmount = options.outputAmount;
+        this.learningRate = options.learningRate || 0.01;
+        
         // Hidden layer init
-        this.weightsInputToHidden = Array.from({ length: hiddenAmount }, () =>
-            Array.from({ length: inputAmount }, () => Math.random() * 2 - 1)
+        this.weightsInputToHidden = Array.from({ length: this.hiddenAmount }, () =>
+            Array.from({ length: this.inputAmount }, () => Math.random() * 2 - 1)
         );
         this.biasHidden = Array(this.hiddenAmount).fill(0);
         this.hiddenLayer = new Array(this.hiddenAmount).fill(0);
