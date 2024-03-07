@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CatBrain = void 0;
+const utils_1 = require("./utils");
 class CatBrain {
     // Basic configurations
     inputAmount; // Amount of input nodes
@@ -148,9 +149,18 @@ class CatBrain {
     }
     // Train with iterations and given data sets
     train(iterations, trainingData) {
-        for (let i = 0; i < iterations; i++) {
-            const data = trainingData[Math.floor(Math.random() * trainingData.length)];
+        let dataObjectIndex = 0;
+        // Shuffle the dataset first
+        (0, utils_1.shuffle)(trainingData);
+        for (let iteration = 0; iteration < iterations; iteration++) {
+            const data = trainingData[dataObjectIndex];
             this.backPropagate(data.inputs, data.outputs);
+            // If we have gone through all of the dataset, reshuffle it and continue training
+            if (dataObjectIndex === trainingData.length - 1) {
+                (0, utils_1.shuffle)(trainingData);
+            }
+            // Move to the next data object, reset to the first if reached limit
+            dataObjectIndex = (dataObjectIndex + 1) % trainingData.length;
         }
     }
     // Sigmoid function for activation
