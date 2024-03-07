@@ -24,7 +24,7 @@ class CatBrain {
         // Hidden layer init
         this.hiddenLayers = this.hiddenAmounts.map(hiddenAmount => new Array(hiddenAmount).fill(0));
         // Init a list of layers which contains a list of weights targetting the node of that position in the layer
-        this.hiddenWeights = Array.from({ length: this.hiddenLayers.length }, (hiddenLayer, layerIndex) => {
+        this.hiddenWeights = options.hiddenWeights || Array.from({ length: this.hiddenLayers.length }, (hiddenLayer, layerIndex) => {
             return Array.from({ length: this.hiddenAmounts[layerIndex] }, (hiddenNode, nodeIndex) => {
                 if (layerIndex === 0) {
                     return Array.from({ length: this.inputAmount }, () => Math.random() * 2 - 1);
@@ -35,13 +35,13 @@ class CatBrain {
             });
         });
         // Init a list of layers which contains their biases for each of their node
-        this.hiddenBiases = Array.from({ length: this.hiddenLayers.length }, (hiddenLayer, layerIndex) => {
+        this.hiddenBiases = options.hiddenBiases || Array.from({ length: this.hiddenLayers.length }, (hiddenLayer, layerIndex) => {
             return new Array(this.hiddenAmounts[layerIndex]).fill(0);
         });
         // Init a list of weights targetting the node of that position in the output layer
-        this.outputWeights = Array.from({ length: this.outputAmount }, () => Array.from({ length: this.hiddenAmounts[this.hiddenAmounts.length - 1] }, () => Math.random() * 2 - 1));
+        this.outputWeights = options.outputWeights || Array.from({ length: this.outputAmount }, () => Array.from({ length: this.hiddenAmounts[this.hiddenAmounts.length - 1] }, () => Math.random() * 2 - 1));
         // Init a list of bias for each output node
-        this.outputBias = new Array(this.outputAmount).fill(0);
+        this.outputBias = options.outputBias || new Array(this.outputAmount).fill(0);
     }
     // Feed forward
     feedForward(inputs) {
