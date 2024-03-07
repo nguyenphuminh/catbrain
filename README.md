@@ -22,24 +22,24 @@ const { CatBrain } = require("./index");
 
 // Create a neural network
 const neuralNetwork = new CatBrain({
-	inputAmount: 2, // Amount of input nodes
-	hiddenAmounts: [ 3 ], // Amount of nodes for each hidden layer
-	outputAmount: 1, // Amount of output nodes
-	learningRate: 0.03 // Learning rate
+    inputAmount: 2, // Amount of input nodes
+    hiddenAmounts: [3], // Amount of nodes for each hidden layer
+    outputAmount: 1, // Amount of output nodes
+    learningRate: 0.02 // Learning rate
 });
 
 // Train
 neuralNetwork.train(
-	// Amount of iterations
-	50000,
-	// Dataset as an array
-	[
-		// A data object with expected output of an input 
-		{ inputs: [0, 0], outputs: [0] },
-		{ inputs: [0, 1], outputs: [1] },
-		{ inputs: [1, 0], outputs: [1] },
-		{ inputs: [1, 1], outputs: [0] }
-	]
+    // Amount of iterations
+    100000,
+    // Dataset as an array
+    [
+        // A data object with expected output of an input 
+        { inputs: [0, 0], outputs: [0] },
+        { inputs: [0, 1], outputs: [1] },
+        { inputs: [1, 0], outputs: [1] },
+        { inputs: [1, 1], outputs: [0] }
+    ]
 );
 
 // Run the neural net with our own input
