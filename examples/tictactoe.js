@@ -53,6 +53,17 @@ neuralNetwork.train(50000, [
 ]);
 
 // O won
-console.log(neuralNetwork.feedForward([ 1, 1, -1, -1, -1, -1, 1, 0, 1 ]));
+console.log(`
+X X O
+O O O
+X _ X
+`);
+console.log("Winner:", Math.round(neuralNetwork.feedForward([ 1, 1, -1, -1, -1, -1, 1, 0, 1 ])[0]) ? "X" : "O");
 // X won
-console.log(neuralNetwork.feedForward([ 1, 0, -1, 0, 1, 0, -1, 0, 1 ]));
+console.log(`
+X _ O
+_ X _
+O _ X
+`);
+console.log("Winner:", Math.round(neuralNetwork.feedForward([ 1, 0, -1, 0, 1, 0, -1, 0, 1 ])[0]) ? "X" : "O");
+
