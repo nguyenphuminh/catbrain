@@ -5,7 +5,7 @@ const dataset = require("./datasets/digitalRecognition");
 // so this will probably be inaccurate in a lot of cases, but eh it kind of works
 const neuralNetwork = new CatBrain({
     inputAmount: 49, 
-    hiddenAmounts: [ 18, 18 ], 
+    hiddenAmounts: [ 36 ], 
     outputAmount: 10,
     learningRate: 0.001
 });
