@@ -3,7 +3,7 @@ const { CatBrain } = require("../../dist/core");
 const fs = require("fs");
 
 // Generate the dataset
-const set = mnist.set(32000, 1000);
+const set = mnist.set(60000, 1000);
 // Training set
 const trainingSet = set.training;
 // Test net
@@ -20,7 +20,7 @@ const neuralNetwork = new CatBrain({
 // Train
 const start = Date.now();
 console.log("Training...");
-neuralNetwork.train(256000, normalizeSet(trainingSet));
+neuralNetwork.train(300000, normalizeSet(trainingSet));
 console.log(`Training ended in ${Date.now() - start}ms`);
 
 // Calculate accuracy
