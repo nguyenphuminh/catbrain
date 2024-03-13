@@ -46,6 +46,21 @@ neuralNetwork.train(
 console.log(neuralNetwork.feedForward([1, 0]));
 ```
 
+## Examples
+
+There are several examples available in `./examples`:
+* [MNIST digit recognition](./examples/mnist)
+* [Tictactoe winner guesser](./examples/tictactoe.js)
+
+## Todos
+
+Current what I have in my mind are:
+
+* Refactor code.
+* More activation functions.
+* Train with GPU.
+* More neural network models?
+
 ## Copyrights and License
 
 Copyrights © 2024 Nguyen Phu Minh.
