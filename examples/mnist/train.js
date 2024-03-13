@@ -12,7 +12,7 @@ const testSet = set.test;
 // Create a CatBrain instance
 const neuralNetwork = new CatBrain({
     inputAmount: 784, 
-    hiddenAmounts: [ 396, 132 ], 
+    hiddenAmounts: [ 256, 256, 256 ], 
     outputAmount: 10,
     learningRate: 0.001
 });
