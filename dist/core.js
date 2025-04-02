@@ -1,31 +1,37 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CatBrain = void 0;
+const activation_1 = require("./activation");
 const utils_1 = require("./utils");
 class CatBrain {
-    // Basic configurations
     inputAmount; // Amount of input nodes
-    hiddenAmounts; // Hidden layers with their size
+    hiddenAmounts; // Amount of hidden nodes in each hidden layer
     outputAmount; // Amount of output nodes
     learningRate;
-    // The hidden layer
-    hiddenLayers; // Hidden layers and their nodes' value
-    // Weights, layer -> node in layer -> node in previous layer
+    shuffle; // Choose whether to shuffle dataset when training
+    activation; // Choose activation function (sigmoid, relu, tanh, etc)
+    derivative; // Derivative of the activation function
+    hiddenLayers;
     hiddenWeights;
     hiddenBiases;
-    // The output layer
     outputWeights;
     outputBias;
     constructor(options) {
+        // Basic configuration
         this.inputAmount = options.inputAmount;
         this.hiddenAmounts = options.hiddenAmounts;
         this.outputAmount = options.outputAmount;
         this.learningRate = options.learningRate || 0.01;
-        // Hidden layer init
+        this.shuffle = typeof options.shuffle === "boolean" ? options.shuffle : true;
+        this.activation = activation_1.Activation[options.activation] || activation_1.Activation.sigmoid;
+        this.derivative = activation_1.Activation[options.activation + "Derivative"] || activation_1.Activation.sigmoidDerivative;
+        // Model configuration
+        // Init hidden layers with the configured amount of neurons and set them to 0 at first
         this.hiddenLayers = this.hiddenAmounts.map(hiddenAmount => new Array(hiddenAmount).fill(0));
-        // Init a list of layers which contains a list of weights targetting the node of that position in the layer
+        // Init a list of randomized weights for each node of each layer
         this.hiddenWeights = options.hiddenWeights || Array.from({ length: this.hiddenLayers.length }, (hiddenLayer, layerIndex) => {
             return Array.from({ length: this.hiddenAmounts[layerIndex] }, (hiddenNode, nodeIndex) => {
+                // Amount of weights of a node is the number of nodes of the previous layer
                 if (layerIndex === 0) {
                     return Array.from({ length: this.inputAmount }, () => Math.random() * 2 - 1);
                 }
@@ -34,53 +40,26 @@ class CatBrain {
                 }
             });
         });
-        // Init a list of layers which contains their biases for each of their node
+        // Init a list of biases for each node of each layer
         this.hiddenBiases = options.hiddenBiases || Array.from({ length: this.hiddenLayers.length }, (hiddenLayer, layerIndex) => {
             return new Array(this.hiddenAmounts[layerIndex]).fill(0);
         });
+        // Output configuration
         // Init a list of weights targetting the node of that position in the output layer
         this.outputWeights = options.outputWeights || Array.from({ length: this.outputAmount }, () => Array.from({ length: this.hiddenAmounts[this.hiddenAmounts.length - 1] }, () => Math.random() * 2 - 1));
         // Init a list of bias for each output node
         this.outputBias = options.outputBias || new Array(this.outputAmount).fill(0);
     }
-    // Feed forward
     feedForward(inputs) {
-        // Propagate hidden layer from input nodes
-        for (let nodeIndex = 0; nodeIndex < this.hiddenAmounts[0]; nodeIndex++) {
-            this.hiddenLayers[0][nodeIndex] = 0;
-            for (let inputNodeIndex = 0; inputNodeIndex < this.inputAmount; inputNodeIndex++) {
-                this.hiddenLayers[0][nodeIndex] += this.hiddenWeights[0][nodeIndex][inputNodeIndex] * inputs[inputNodeIndex];
-            }
-            this.hiddenLayers[0][nodeIndex] += this.hiddenBiases[0][nodeIndex];
-            this.hiddenLayers[0][nodeIndex] = this.sigmoid(this.hiddenLayers[0][nodeIndex]);
+        // Propagate hidden layers with layers behind them
+        for (let index = 0; index < this.hiddenLayers.length; index++) {
+            (0, utils_1.weighedSum)(this.hiddenLayers[index], this.hiddenWeights[index], this.hiddenBiases[index], index === 0 ? inputs : this.hiddenLayers[index - 1], this.activation);
         }
-        // Propagate hidden layer from previous hidden layer
-        for (let hiddenLayer = 1; hiddenLayer < this.hiddenLayers.length; hiddenLayer++) {
-            // Loop through nodes in the current hidden layer
-            for (let nodeIndex = 0; nodeIndex < this.hiddenAmounts[hiddenLayer]; nodeIndex++) {
-                this.hiddenLayers[hiddenLayer][nodeIndex] = 0;
-                for (let prevNodeIndex = 0; prevNodeIndex < this.hiddenAmounts[hiddenLayer - 1]; prevNodeIndex++) {
-                    this.hiddenLayers[hiddenLayer][nodeIndex] +=
-                        this.hiddenWeights[hiddenLayer][nodeIndex][prevNodeIndex] *
-                            this.hiddenLayers[hiddenLayer - 1][prevNodeIndex];
-                }
-                this.hiddenLayers[hiddenLayer][nodeIndex] += this.hiddenBiases[hiddenLayer][nodeIndex];
-                this.hiddenLayers[hiddenLayer][nodeIndex] = this.sigmoid(this.hiddenLayers[hiddenLayer][nodeIndex]);
-            }
-        }
-        // Propagate output from hidden layer nodes
+        // Propagate output from the last hidden layer
         const output = new Array(this.outputAmount);
-        for (let nodeIndex = 0; nodeIndex < this.outputAmount; nodeIndex++) {
-            output[nodeIndex] = 0;
-            for (let prevNodeIndex = 0; prevNodeIndex < this.hiddenAmounts[this.hiddenAmounts.length - 1]; prevNodeIndex++) {
-                output[nodeIndex] += this.outputWeights[nodeIndex][prevNodeIndex] * this.hiddenLayers[this.hiddenLayers.length - 1][prevNodeIndex];
-            }
-            output[nodeIndex] += this.outputBias[nodeIndex];
-            output[nodeIndex] = this.sigmoid(output[nodeIndex]);
-        }
+        (0, utils_1.weighedSum)(output, this.outputWeights, this.outputBias, this.hiddenLayers[this.hiddenLayers.length - 1], this.activation);
         return output;
     }
-    // Backpropagation training
     backPropagate(inputs, target) {
         const output = this.feedForward(inputs);
         const errorsOutput = new Array(this.outputAmount).fill(0);
@@ -94,8 +73,7 @@ class CatBrain {
                 this.outputWeights[nodeIndex][prevNodeIndex] +=
                     this.learningRate *
                         errorsOutput[nodeIndex] *
-                        output[nodeIndex] *
-                        (1 - output[nodeIndex]) *
+                        this.derivative(output[nodeIndex]) *
                         this.hiddenLayers[this.hiddenLayers.length - 1][prevNodeIndex];
             }
             // Update bias for each output node
@@ -127,8 +105,7 @@ class CatBrain {
                     this.hiddenWeights[hiddenLayer][nodeIndex][prevNodeIndex] +=
                         this.learningRate *
                             errorsHidden[hiddenLayer][nodeIndex] *
-                            this.hiddenLayers[hiddenLayer][nodeIndex] *
-                            (1 - this.hiddenLayers[hiddenLayer][nodeIndex]) *
+                            this.derivative(this.hiddenLayers[hiddenLayer][nodeIndex]) *
                             this.hiddenLayers[hiddenLayer - 1][prevNodeIndex];
                 }
                 // Update bias for each hidden node
@@ -141,31 +118,27 @@ class CatBrain {
                 this.hiddenWeights[0][nodeIndex][prevNodeIndex] +=
                     this.learningRate *
                         errorsHidden[0][nodeIndex] *
-                        this.hiddenLayers[0][nodeIndex] *
-                        (1 - this.hiddenLayers[0][nodeIndex]) *
+                        this.derivative(this.hiddenLayers[0][nodeIndex]) *
                         inputs[prevNodeIndex];
             }
         }
     }
-    // Train with iterations and given data sets
     train(iterations, trainingData) {
         let dataObjectIndex = 0;
         // Shuffle the dataset first
-        (0, utils_1.shuffle)(trainingData);
+        if (this.shuffle)
+            (0, utils_1.shuffle)(trainingData);
         for (let iteration = 0; iteration < iterations; iteration++) {
             const data = trainingData[dataObjectIndex];
             this.backPropagate(data.inputs, data.outputs);
             // If we have gone through all of the dataset, reshuffle it and continue training
             if (dataObjectIndex === trainingData.length - 1) {
-                (0, utils_1.shuffle)(trainingData);
+                if (this.shuffle)
+                    (0, utils_1.shuffle)(trainingData);
             }
             // Move to the next data object, reset to the first if reached limit
             dataObjectIndex = (dataObjectIndex + 1) % trainingData.length;
         }
-    }
-    // Sigmoid function for activation
-    sigmoid(x) {
-        return 1 / (1 + Math.exp(-x));
     }
 }
 exports.CatBrain = CatBrain;
