@@ -1,5 +1,5 @@
 import { Activation } from "./activation";
-import { shuffle, weighedSum } from "./utils";
+import { shuffle } from "./utils";
 
 export interface CatBrainOptions {
     // Amount of neurons
@@ -13,8 +13,12 @@ export interface CatBrainOptions {
     outputWeights: number[][];
     outputBias: number[];
 
-    // Other configurations
+    // Activation configuration
     activation: string;
+    leakyReluAlpha: number;
+    reluClip: number;
+
+    // Other configurations
     learningRate: number;
     shuffle: boolean;
 }
@@ -25,8 +29,7 @@ export class CatBrain {
     public outputAmount: number; // Amount of output nodes
     public learningRate: number;
     public shuffle: boolean; // Choose whether to shuffle dataset when training
-    public activation: Function; // Choose activation function (sigmoid, relu, tanh, etc)
-    public derivative: Function; // Derivative of the activation function
+    public activation: Activation;
 
     public hiddenLayers: number[][];
     public hiddenWeights: number[][][];
@@ -42,8 +45,14 @@ export class CatBrain {
         this.outputAmount = options.outputAmount;
         this.learningRate = options.learningRate || 0.01;
         this.shuffle = typeof options.shuffle === "boolean" ? options.shuffle : true;
-        this.activation = (Activation as Record<string, any>)[options.activation] || Activation.sigmoid;
-        this.derivative = (Activation as Record<string, any>)[options.activation + "Derivative"] || Activation.sigmoidDerivative;
+
+        
+        // Activation function configuration
+        this.activation = new Activation({
+            leakyReluAlpha: options.leakyReluAlpha || 0.01,
+            reluClip: options.reluClip || 5,
+            activation: options.activation || "sigmoid"
+        });
 
 
         // Model configuration
@@ -80,24 +89,23 @@ export class CatBrain {
     feedForward(inputs: number[]) {
         // Propagate hidden layers with layers behind them
         for (let index = 0; index < this.hiddenLayers.length; index++) {
-            weighedSum(
+            this.weighedSum(
                 this.hiddenLayers[index],
                 this.hiddenWeights[index],
                 this.hiddenBiases[index],
-                index === 0 ? inputs : this.hiddenLayers[index - 1],
-                this.activation
+                index === 0 ? inputs : this.hiddenLayers[index - 1]
             );
         }
 
         // Propagate output from the last hidden layer
         const output = new Array(this.outputAmount);
 
-        weighedSum(
+        this.weighedSum(
             output,
             this.outputWeights,
             this.outputBias,
             this.hiddenLayers[this.hiddenLayers.length - 1],
-            this.activation
+            true
         );
 
         return output;
@@ -119,7 +127,7 @@ export class CatBrain {
                 this.outputWeights[nodeIndex][prevNodeIndex] +=
                     this.learningRate *
                     errorsOutput[nodeIndex] *
-                    this.derivative(output[nodeIndex]) *
+                    this.activation.sigmoidDerivative(output[nodeIndex]) * // Always apply sigmoid in the output layer
                     this.hiddenLayers[this.hiddenLayers.length - 1][prevNodeIndex];
             }
 
@@ -154,7 +162,7 @@ export class CatBrain {
                     this.hiddenWeights[hiddenLayer][nodeIndex][prevNodeIndex] +=
                         this.learningRate *
                         errorsHidden[hiddenLayer][nodeIndex] *
-                        this.derivative(this.hiddenLayers[hiddenLayer][nodeIndex]) *
+                        this.activation.derivative(this.hiddenLayers[hiddenLayer][nodeIndex]) *
                         this.hiddenLayers[hiddenLayer - 1][prevNodeIndex];
                 }
 
@@ -169,7 +177,7 @@ export class CatBrain {
                 this.hiddenWeights[0][nodeIndex][prevNodeIndex] +=
                     this.learningRate *
                     errorsHidden[0][nodeIndex] *
-                    this.derivative(this.hiddenLayers[0][nodeIndex]) *
+                    this.activation.derivative(this.hiddenLayers[0][nodeIndex]) *
                     inputs[prevNodeIndex];
             }
         }
@@ -192,6 +200,36 @@ export class CatBrain {
 
             // Move to the next data object, reset to the first if reached limit
             dataObjectIndex = (dataObjectIndex + 1) % trainingData.length;
+        }
+    }
+
+    weighedSum(
+        currentLayer: number[],
+        currentWeights: number[][],
+        currentBiases: number[],
+        prevLayer: number[],
+        isOutput?: boolean
+    ) {
+        for (let index = 0; index < currentLayer.length; index++) {
+            currentLayer[index] = 0;
+    
+            // Get weighed sum
+            for (let prevIndex = 0; prevIndex < prevLayer.length; prevIndex++) {
+                const weight = currentWeights[index][prevIndex];
+                const prevNode = prevLayer[prevIndex];
+    
+                currentLayer[index] += weight * prevNode;
+            }
+    
+            // Add bias
+            currentLayer[index] += currentBiases[index];
+            // Activate
+            if (isOutput) {
+                // Always apply sigmoid in the output layer
+                currentLayer[index] = this.activation.sigmoid(currentLayer[index]);
+            } else {
+                currentLayer[index] = this.activation.activate(currentLayer[index]);
+            }
         }
     }
 }

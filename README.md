@@ -4,21 +4,16 @@ An attempt to create a neural network framework
 
 ## Setup
 
-Clone the repository:
-```sh
-git clone https://github.com/nguyenphuminh/catbrain.git
+Install through npm:
 ```
-
-Install the dependencies:
-```
-npm i
+npm install catbrain
 ```
 
 ## Use
 
 Create a Javascript file like this:
 ```js
-const { CatBrain } = require("./index");
+const { CatBrain } = require("catbrain");
 
 // Create a neural network
 const neuralNetwork = new CatBrain({
@@ -34,7 +29,7 @@ neuralNetwork.train(
     100000,
     // Dataset as an array
     [
-        // A data object with expected output of an input 
+        // A data object with expected outputs of inputs 
         { inputs: [0, 0], outputs: [0] },
         { inputs: [0, 1], outputs: [1] },
         { inputs: [1, 0], outputs: [1] },
@@ -54,15 +49,15 @@ There are several examples available in `./examples`:
 
 ## Todos
 
-Current what I have in my mind are:
+Currently what I have in mind are:
 
-* Refactor code.
+* Code refactoring.
 * More activation functions.
-* Train with GPU.
-* More neural network models?
+* Training with GPU.
+* More neural network architectures.
 
 ## Copyrights and License
 
-Copyrights © 2024 Nguyen Phu Minh.
+Copyrights © 2025 Nguyen Phu Minh.
 
 This project is licensed under the GPL 3.0 License.
