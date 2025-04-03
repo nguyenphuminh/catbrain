@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.shuffle = void 0;
+exports.shuffle = shuffle;
 // Fisher-Yates shuffling algorithm
 function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -8,5 +8,4 @@ function shuffle(array) {
         [array[i], array[j]] = [array[j], array[i]];
     }
 }
-exports.shuffle = shuffle;
 ;
