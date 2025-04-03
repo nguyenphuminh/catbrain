@@ -17,10 +17,23 @@ const { CatBrain } = require("catbrain");
 
 // Create a neural network
 const neuralNetwork = new CatBrain({
+    // Required
     inputAmount: 2, // Amount of input nodes
     hiddenAmounts: [3], // Amount of nodes for each hidden layer
     outputAmount: 1, // Amount of output nodes
-    learningRate: 0.02 // Learning rate
+
+    // Optional config
+    learningRate: 0.02, // Learning rate, default is 0.01
+    shuffle: true, // Choose whether to shuffle the dataset, default is true
+    activation: "sigmoid", // sigmoid/tanh/relu/leakyRelu, default is sigmoid
+    leakyReluAlpha: 0.01, // Alpha of leaky relu if you use it, default is 0.01
+    reluClip: 5, // Relu clipping, default is 5
+
+    // Options to load existing models, randomly initialized if not provided
+    // hiddenWeights: number[][][],
+    // hiddenBiases: number[][],
+    // outputWeights: number[][],
+    // outputBias: number[]
 });
 
 // Train
