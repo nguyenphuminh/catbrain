@@ -1,6 +1,6 @@
 {
   "name": "catbrain",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "An experimental neural network framework",
   "main": "index.js",
   "scripts": {
@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/nguyenphuminh/catbrain#readme",
   "devDependencies": {
+    "@types/node": "^22.14.0",
     "typescript": "^5.3.3"
   },
   "files": [

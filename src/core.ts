@@ -1,4 +1,4 @@
-import { Activation } from "./activation";
+import { Activation, ActivationOptions } from "./activation";
 import { shuffle } from "./utils";
 
 export interface CatBrainOptions {
@@ -8,19 +8,19 @@ export interface CatBrainOptions {
     outputAmount: number;
 
     // Self-submit weights and biases
-    hiddenWeights: number[][][];
-    hiddenBiases: number[][];
-    outputWeights: number[][];
-    outputBias: number[];
+    hiddenWeights?: number[][][];
+    hiddenBiases?: number[][];
+    outputWeights?: number[][];
+    outputBias?: number[];
 
     // Activation configuration
-    activation: string;
-    leakyReluAlpha: number;
-    reluClip: number;
+    activation?: string;
+    leakyReluAlpha?: number;
+    reluClip?: number;
 
     // Other configurations
-    learningRate: number;
-    shuffle: boolean;
+    learningRate?: number;
+    shuffle?: boolean;
 }
 
 export class CatBrain {
@@ -29,7 +29,10 @@ export class CatBrain {
     public outputAmount: number; // Amount of output nodes
     public learningRate: number;
     public shuffle: boolean; // Choose whether to shuffle dataset when training
-    public activation: Activation;
+
+    public activationOptions: ActivationOptions;
+    public activation: Function;
+    public derivative: Function;
 
     public hiddenLayers: number[][];
     public hiddenWeights: number[][][];
@@ -44,15 +47,17 @@ export class CatBrain {
         this.hiddenAmounts = options.hiddenAmounts;
         this.outputAmount = options.outputAmount;
         this.learningRate = options.learningRate || 0.01;
-        this.shuffle = typeof options.shuffle === "boolean" ? options.shuffle : true;
+        this.shuffle = options.shuffle ?? true;
 
-        
+
         // Activation function configuration
-        this.activation = new Activation({
+        this.activationOptions = {
             leakyReluAlpha: options.leakyReluAlpha || 0.01,
-            reluClip: options.reluClip || 5,
-            activation: options.activation || "sigmoid"
-        });
+            reluClip: options.reluClip || 5
+        }
+        const activation = options.activation || "sigmoid";
+        this.activation = (Activation as Record<string, any>)[activation] || Activation.sigmoid;
+        this.derivative = (Activation as Record<string, any>)[activation + "Derivative"] || Activation.sigmoidDerivative;
 
 
         // Model configuration
@@ -127,7 +132,7 @@ export class CatBrain {
                 this.outputWeights[nodeIndex][prevNodeIndex] +=
                     this.learningRate *
                     errorsOutput[nodeIndex] *
-                    this.activation.sigmoidDerivative(output[nodeIndex]) * // Always apply sigmoid in the output layer
+                    Activation.sigmoidDerivative(output[nodeIndex]) * // Always apply sigmoid in the output layer
                     this.hiddenLayers[this.hiddenLayers.length - 1][prevNodeIndex];
             }
 
@@ -162,7 +167,7 @@ export class CatBrain {
                     this.hiddenWeights[hiddenLayer][nodeIndex][prevNodeIndex] +=
                         this.learningRate *
                         errorsHidden[hiddenLayer][nodeIndex] *
-                        this.activation.derivative(this.hiddenLayers[hiddenLayer][nodeIndex]) *
+                        this.derivative(this.hiddenLayers[hiddenLayer][nodeIndex], this.activationOptions) *
                         this.hiddenLayers[hiddenLayer - 1][prevNodeIndex];
                 }
 
@@ -177,7 +182,7 @@ export class CatBrain {
                 this.hiddenWeights[0][nodeIndex][prevNodeIndex] +=
                     this.learningRate *
                     errorsHidden[0][nodeIndex] *
-                    this.activation.derivative(this.hiddenLayers[0][nodeIndex]) *
+                    this.derivative(this.hiddenLayers[0][nodeIndex], this.activationOptions) *
                     inputs[prevNodeIndex];
             }
         }
@@ -212,23 +217,23 @@ export class CatBrain {
     ) {
         for (let index = 0; index < currentLayer.length; index++) {
             currentLayer[index] = 0;
-    
+
             // Get weighed sum
             for (let prevIndex = 0; prevIndex < prevLayer.length; prevIndex++) {
                 const weight = currentWeights[index][prevIndex];
                 const prevNode = prevLayer[prevIndex];
-    
+
                 currentLayer[index] += weight * prevNode;
             }
-    
+
             // Add bias
             currentLayer[index] += currentBiases[index];
             // Activate
             if (isOutput) {
                 // Always apply sigmoid in the output layer
-                currentLayer[index] = this.activation.sigmoid(currentLayer[index]);
+                currentLayer[index] = Activation.sigmoid(currentLayer[index]);
             } else {
-                currentLayer[index] = this.activation.activate(currentLayer[index]);
+                currentLayer[index] = this.activation(currentLayer[index], this.activationOptions);
             }
         }
     }
