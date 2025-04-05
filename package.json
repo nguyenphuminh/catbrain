@@ -1,6 +1,6 @@
 {
   "name": "catbrain",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "An experimental neural network framework",
   "main": "index.js",
   "scripts": {
