@@ -28,11 +28,13 @@ export declare class CatBrain {
     outputWeights: number[][];
     outputBias: number[];
     constructor(options: CatBrainOptions);
-    feedForward(inputs: number[]): any[];
+    feedForward(inputs: number[]): number[];
+    feedForward(inputs: number[], getPreActivation: boolean): [number[], number[][]];
     backPropagate(inputs: number[], target: number[]): void;
     train(iterations: number, trainingData: {
         inputs: number[];
         outputs: number[];
     }[]): void;
-    weighedSum(currentLayer: number[], currentWeights: number[][], currentBiases: number[], prevLayer: number[], isOutput?: boolean): void;
+    weighedSum(currentLayer: number[], currentWeights: number[][], currentBiases: number[], prevLayer: number[]): void;
+    activateLayer(currentLayer: number[], isOutput?: boolean): void;
 }
