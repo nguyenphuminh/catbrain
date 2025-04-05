@@ -1,6 +1,6 @@
 # CatBrain
 
-An attempt to create a neural network framework
+An experimental neural network framework
 
 ## Setup
 
