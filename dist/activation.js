@@ -40,5 +40,14 @@ class Activation {
             return 0;
         return x > 0 ? 1 : options.leakyReluAlpha;
     }
+    // Swish for activation
+    static swish(x, options) {
+        return Math.max(-options.reluClip, Math.min(x / (1 + Math.exp(-x)), options.reluClip));
+    }
+    // Swish derivative
+    static swishDerivative(x, options) {
+        const sigmoid = 1 / (1 + Math.exp(-x));
+        return Math.max(-options.reluClip, Math.min(sigmoid + x * sigmoid * (1 - sigmoid), options.reluClip));
+    }
 }
 exports.Activation = Activation;
