@@ -9,9 +9,9 @@ Install through npm:
 npm install catbrain
 ```
 
-## Use
+## Tutorial
 
-Create a Javascript file like this:
+Here is how to create, train, and run a neural net using Catbrain. All the options and config are shown as comments.
 ```js
 const { CatBrain } = require("catbrain");
 
@@ -24,6 +24,7 @@ const neuralNetwork = new CatBrain({
 
     // Optional config
     learningRate: 0.02, // Learning rate, default is 0.01
+    decayRate: 0.9999, // Learning decay rate for each iteration, default is 1
     shuffle: true, // Choose whether to shuffle the dataset, default is true
     activation: "sigmoid", // sigmoid/tanh/relu/leakyRelu, default is sigmoid
     leakyReluAlpha: 0.01, // Alpha of leaky relu if you use it, default is 0.01
@@ -48,6 +49,11 @@ neuralNetwork.train(
         { inputs: [1, 0], outputs: [1] },
         { inputs: [1, 1], outputs: [0] }
     ]
+    // You can also pass in optional training options as well:
+    // , {
+    //     learningRate: 0.02, // Will use original learning rate if not provided
+    //     decayRate: 0.9999, // Will use original decay rate if not provided
+    // }
 );
 
 // Run the neural net with our own input

@@ -1,6 +1,11 @@
 import { Activation, ActivationOptions } from "./activation";
 import { shuffle } from "./utils";
 
+export interface TrainingOptions {
+    learningRate?: number;
+    decayRate?: number;
+}
+
 export interface CatBrainOptions {
     // Amount of neurons
     inputAmount: number;
@@ -18,8 +23,9 @@ export interface CatBrainOptions {
     leakyReluAlpha?: number;
     reluClip?: number;
 
-    // Other configurations
+    // Training configurations
     learningRate?: number;
+    decayRate?: number;
     shuffle?: boolean;
 }
 
@@ -27,7 +33,9 @@ export class CatBrain {
     public inputAmount: number; // Amount of input nodes
     public hiddenAmounts: number[]; // Amount of hidden nodes in each hidden layer
     public outputAmount: number; // Amount of output nodes
+
     public learningRate: number;
+    public decayRate: number;
     public shuffle: boolean; // Choose whether to shuffle dataset when training
 
     public activationOptions: ActivationOptions;
@@ -47,6 +55,7 @@ export class CatBrain {
         this.hiddenAmounts = options.hiddenAmounts;
         this.outputAmount = options.outputAmount;
         this.learningRate = options.learningRate || 0.01;
+        this.decayRate = options.decayRate || 1;
         this.shuffle = options.shuffle ?? true;
 
 
@@ -150,7 +159,11 @@ export class CatBrain {
         return output;
     }
 
-    backPropagate(inputs: number[], target: number[]) {
+    backPropagate(inputs: number[], target: number[], options: TrainingOptions) {
+        const trainingOptions = {
+            learningRate: options?.learningRate || this.learningRate
+        }
+
         const [output, preActLayers] = this.feedForward(inputs, true);
 
         const errorsOutput = new Array(this.outputAmount).fill(0);
@@ -163,14 +176,14 @@ export class CatBrain {
             // Update weights for each output node
             for (let prevNodeIndex = 0; prevNodeIndex < this.hiddenAmounts[this.hiddenAmounts.length - 1]; prevNodeIndex++) {
                 this.outputWeights[nodeIndex][prevNodeIndex] +=
-                    this.learningRate *
+                    trainingOptions.learningRate *
                     errorsOutput[nodeIndex] *
                     Activation.sigmoidDerivative(output[nodeIndex]) * // Always apply sigmoid in the output layer
                     this.hiddenLayers[this.hiddenLayers.length - 1][prevNodeIndex];
             }
 
             // Update bias for each output node
-            this.outputBias[nodeIndex] += this.learningRate * errorsOutput[nodeIndex];
+            this.outputBias[nodeIndex] += trainingOptions.learningRate * errorsOutput[nodeIndex];
         }
 
         // Backpropagate from hidden layer to hidden layer
@@ -198,38 +211,50 @@ export class CatBrain {
                 // Update weights for each hidden node
                 for (let prevNodeIndex = 0; prevNodeIndex < this.hiddenAmounts[hiddenLayer - 1]; prevNodeIndex++) {
                     this.hiddenWeights[hiddenLayer][nodeIndex][prevNodeIndex] +=
-                        this.learningRate *
+                        trainingOptions.learningRate *
                         errorsHidden[hiddenLayer][nodeIndex] *
                         this.derivative(preActLayers[hiddenLayer][nodeIndex], this.hiddenLayers[hiddenLayer][nodeIndex]) *
                         this.hiddenLayers[hiddenLayer - 1][prevNodeIndex];
                 }
 
                 // Update bias for each hidden node
-                this.hiddenBiases[hiddenLayer][nodeIndex] += this.learningRate * errorsHidden[hiddenLayer][nodeIndex];
+                this.hiddenBiases[hiddenLayer][nodeIndex] += trainingOptions.learningRate * errorsHidden[hiddenLayer][nodeIndex];
             }
         }
 
         // Backpropagate from hidden layer to input layer
         for (let nodeIndex = 0; nodeIndex < this.hiddenAmounts[0]; nodeIndex++) {
+            // Update weights for each hidden node in first hidden layer
             for (let prevNodeIndex = 0; prevNodeIndex < this.inputAmount; prevNodeIndex++) {
                 this.hiddenWeights[0][nodeIndex][prevNodeIndex] +=
-                    this.learningRate *
+                    trainingOptions.learningRate *
                     errorsHidden[0][nodeIndex] *
                     this.derivative(preActLayers[0][nodeIndex], this.hiddenLayers[0][nodeIndex]) *
                     inputs[prevNodeIndex];
             }
+
+            // We don't need to update bias here because it's already done in the previous loop
         }
     }
 
-    train(iterations: number, trainingData: { inputs: number[], outputs: number[] }[]) {
-        let dataObjectIndex = 0;
+    train(
+        iterations: number,
+        trainingData: { inputs: number[], outputs: number[] }[],
+        options?: TrainingOptions
+    ) {
+        const trainingOptions = {
+            learningRate: options?.learningRate || this.learningRate,
+            decayRate: options?.decayRate || this.decayRate
+        }
 
         // Shuffle the dataset first
         if (this.shuffle) shuffle(trainingData);
 
+        let dataObjectIndex = 0;
+
         for (let iteration = 0; iteration < iterations; iteration++) {
             const data = trainingData[dataObjectIndex];
-            this.backPropagate(data.inputs, data.outputs);
+            this.backPropagate(data.inputs, data.outputs, trainingOptions);
 
             // If we have gone through all of the dataset, reshuffle it and continue training
             if (dataObjectIndex === trainingData.length - 1) {
@@ -238,6 +263,9 @@ export class CatBrain {
 
             // Move to the next data object, reset to the first if reached limit
             dataObjectIndex = (dataObjectIndex + 1) % trainingData.length;
+
+            // Update the learning rate
+            trainingOptions.learningRate *= trainingOptions.decayRate;
         }
     }
 
