@@ -108,6 +108,13 @@ class CatBrain {
                         errorsOutput[nodeIndex] *
                         activation_1.Activation.sigmoidDerivative(output[nodeIndex]) * // Always apply sigmoid in the output layer
                         this.hiddenLayers[this.hiddenLayers.length - 1][prevNodeIndex];
+                /*console.log(
+                    this.outputWeights[nodeIndex][prevNodeIndex],
+                    trainingOptions.learningRate,
+                    errorsOutput[nodeIndex],
+                    Activation.sigmoidDerivative(output[nodeIndex]),
+                    this.hiddenLayers[this.hiddenLayers.length - 1][prevNodeIndex]
+                );*/
             }
             // Update bias for each output node
             this.outputBias[nodeIndex] += trainingOptions.learningRate * errorsOutput[nodeIndex];

@@ -47,7 +47,7 @@ class Activation {
     // Swish derivative
     static swishDerivative(x, options) {
         const sigmoid = 1 / (1 + Math.exp(-x));
-        return Math.max(-options.reluClip, Math.min(sigmoid + x * sigmoid * (1 - sigmoid), options.reluClip));
+        return -options.reluClip < x && x < options.reluClip ? sigmoid + x * sigmoid * (1 - sigmoid) : 0;
     }
 }
 exports.Activation = Activation;
