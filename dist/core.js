@@ -142,9 +142,7 @@ class CatBrain {
                             this.hiddenLayers[hiddenLayer - 1][prevNodeIndex];
                 }
                 // Update bias for each hidden node
-                if (hiddenLayer !== 0) {
-                    this.hiddenBiases[hiddenLayer][nodeIndex] += trainingOptions.learningRate * errorsHidden[hiddenLayer][nodeIndex];
-                }
+                this.hiddenBiases[hiddenLayer][nodeIndex] += trainingOptions.learningRate * errorsHidden[hiddenLayer][nodeIndex];
             }
         }
         // Backpropagate from hidden layer to input layer
