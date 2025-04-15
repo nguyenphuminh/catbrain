@@ -1,7 +1,11 @@
 import { ActivationOptions } from "./activation";
+export interface TrainingStatus {
+    iteration: number;
+}
 export interface TrainingOptions {
     learningRate?: number;
     decayRate?: number;
+    callback?: (trainingStatus: TrainingStatus) => void;
 }
 export interface CatBrainOptions {
     inputAmount: number;

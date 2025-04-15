@@ -1,9 +1,14 @@
 import { Activation, ActivationOptions } from "./activation";
 import { shuffle } from "./utils";
 
+export interface TrainingStatus {
+    iteration: number;
+}
+
 export interface TrainingOptions {
     learningRate?: number;
     decayRate?: number;
+    callback?: (trainingStatus: TrainingStatus) => void;
 }
 
 export interface CatBrainOptions {
@@ -253,6 +258,8 @@ export class CatBrain {
         let dataObjectIndex = 0;
 
         for (let iteration = 0; iteration < iterations; iteration++) {
+            if (typeof options?.callback === "function") options.callback({ iteration });
+
             const data = trainingData[dataObjectIndex];
             this.backPropagate(data.inputs, data.outputs, trainingOptions);
 

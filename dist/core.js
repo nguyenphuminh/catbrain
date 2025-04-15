@@ -168,6 +168,8 @@ class CatBrain {
             (0, utils_1.shuffle)(trainingData);
         let dataObjectIndex = 0;
         for (let iteration = 0; iteration < iterations; iteration++) {
+            if (typeof options?.callback === "function")
+                options.callback({ iteration });
             const data = trainingData[dataObjectIndex];
             this.backPropagate(data.inputs, data.outputs, trainingOptions);
             // If we have gone through all of the dataset, reshuffle it and continue training

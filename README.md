@@ -53,6 +53,10 @@ neuralNetwork.train(
     // , {
     //     learningRate: 0.02, // Will use original learning rate if not provided
     //     decayRate: 0.9999, // Will use original decay rate if not provided
+    //     // A function called before every iteration
+    //     callback: (status) => {
+    //         console.log(status.iteration)
+    //     }
     // }
 );
 
