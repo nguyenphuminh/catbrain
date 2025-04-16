@@ -1,6 +1,6 @@
 # CatBrain
 
-An experimental neural network framework
+Neural networks made simple for Javascript
 
 ## Setup
 
@@ -26,7 +26,7 @@ const neuralNetwork = new CatBrain({
     learningRate: 0.02, // Learning rate, default is 0.01
     decayRate: 0.9999, // Learning decay rate for each iteration, default is 1
     shuffle: true, // Choose whether to shuffle the dataset, default is true
-    activation: "sigmoid", // sigmoid/tanh/relu/leakyRelu, default is sigmoid
+    activation: "sigmoid", // sigmoid/tanh/relu/leakyRelu/swish, default is sigmoid
     leakyReluAlpha: 0.01, // Alpha of leaky relu if you use it, default is 0.01
     reluClip: 5, // Relu clipping, default is 5
 
@@ -49,7 +49,7 @@ neuralNetwork.train(
         { inputs: [1, 0], outputs: [1] },
         { inputs: [1, 1], outputs: [0] }
     ]
-    // You can also pass in optional training options as well:
+    // You can also pass in optional training config as well:
     // , {
     //     learningRate: 0.02, // Will use original learning rate if not provided
     //     decayRate: 0.9999, // Will use original decay rate if not provided
@@ -66,7 +66,7 @@ console.log(neuralNetwork.feedForward([1, 0]));
 
 ## Examples
 
-There are several examples available in `./examples`:
+There are several demos available in `./examples`:
 * [MNIST digit recognition](./examples/mnist)
 * [Tictactoe winner guesser](./examples/tictactoe.js)
 
@@ -74,10 +74,11 @@ There are several examples available in `./examples`:
 
 Currently what I have in mind are:
 
-* Code refactoring.
+* Code refactoring and optimization.
 * More activation functions.
-* Training with GPU.
+* GPU acceleration.
 * More neural network architectures.
+* Minor utilities for convenience.
 
 ## Copyrights and License
 
