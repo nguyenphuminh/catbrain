@@ -26,10 +26,10 @@ const neuralNetwork = new CatBrain({
     learningRate: 0.02, // Learning rate, default is 0.01
     decayRate: 0.9999, // Learning decay rate for each iteration, default is 1
     shuffle: true, // Choose whether to shuffle the dataset, default is true
-    activation: "sigmoid", // sigmoid/tanh/relu/leakyRelu/swish/linear, default is sigmoid
+    activation: "sigmoid", // sigmoid/tanh/relu/leakyRelu/swish/softplus/linear, default is sigmoid
     outputActivation: "sigmoid", // Activation at output layer, default is sigmoid
     leakyReluAlpha: 0.01, // Alpha of leaky relu if you use it, default is 0.01
-    reluClip: 5, // Relu clipping, default is 5
+    reluClip: 5, // Relu clipping, applied in activation functions reaching infinity, default is 5
 
     // Options to load existing models, randomly initialized if not provided
     // hiddenWeights: number[][][],
