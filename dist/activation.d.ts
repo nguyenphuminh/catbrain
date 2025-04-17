@@ -13,6 +13,8 @@ export declare class Activation {
     static leakyReluDerivative(x: number, options: ActivationOptions): number;
     static swish(x: number, options: ActivationOptions): number;
     static swishDerivative(x: number, options: ActivationOptions): number;
+    static softplus(x: number, options: ActivationOptions): number;
+    static softplusDerivative(x: number, options: ActivationOptions): number;
     static linear(x: number): number;
     static linearDerivative(): number;
 }

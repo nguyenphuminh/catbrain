@@ -32,22 +32,46 @@ class Activation {
     }
     // Leaky Relu for activation
     static leakyRelu(x, options) {
-        return Math.min(options.reluClip, x > 0 ? x : options.leakyReluAlpha * x);
+        if (x > 0) {
+            return Math.min(options.reluClip, x);
+        }
+        else if (x > -options.reluClip) {
+            return options.leakyReluAlpha * x;
+        }
+        return -options.reluClip * options.leakyReluAlpha;
     }
     // Leaky Rely derivative
     static leakyReluDerivative(x, options) {
-        if (x > options.reluClip)
+        if (x > options.reluClip || x < -options.reluClip)
             return 0;
         return x > 0 ? 1 : options.leakyReluAlpha;
     }
     // Swish for activation
     static swish(x, options) {
-        return Math.max(-options.reluClip, Math.min(x / (1 + Math.exp(-x)), options.reluClip));
+        if (x > options.reluClip) {
+            return options.reluClip / (1 + Math.exp(-options.reluClip));
+        }
+        else if (x < -options.reluClip) {
+            return -options.reluClip / (1 + Math.exp(options.reluClip));
+        }
+        return x / (1 + Math.exp(-x));
     }
     // Swish derivative
     static swishDerivative(x, options) {
+        if (x > options.reluClip || x < -options.reluClip)
+            return 0;
         const sigmoid = 1 / (1 + Math.exp(-x));
-        return -options.reluClip < x && x < options.reluClip ? sigmoid + x * sigmoid * (1 - sigmoid) : 0;
+        return sigmoid + x * sigmoid * (1 - sigmoid);
+    }
+    // Softplus for activation
+    static softplus(x, options) {
+        if (x > options.reluClip)
+            return Math.log(1 + Math.exp(options.reluClip));
+        return Math.log(1 + Math.exp(x));
+    }
+    // Softplus derivative
+    static softplusDerivative(x, options) {
+        return x < options.reluClip ? 1 / (1 + Math.exp(-x)) : 0;
     }
     // No activation
     static linear(x) {
