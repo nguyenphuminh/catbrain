@@ -13,6 +13,8 @@ class CatBrain {
     activationOptions;
     activation;
     derivative;
+    outputActivation;
+    outputDerivative;
     hiddenLayers;
     hiddenWeights;
     hiddenBiases;
@@ -23,6 +25,7 @@ class CatBrain {
         this.inputAmount = options.inputAmount;
         this.hiddenAmounts = options.hiddenAmounts;
         this.outputAmount = options.outputAmount;
+        // Training configuration
         this.learningRate = options.learningRate || 0.01;
         this.decayRate = options.decayRate || 1;
         this.shuffle = options.shuffle ?? true;
@@ -39,6 +42,15 @@ class CatBrain {
                 return derivativeMethod(actValue);
             }
             return derivativeMethod(preActValue, this.activationOptions);
+        };
+        const outputActivation = options.outputActivation || "sigmoid";
+        this.outputActivation = activation_1.Activation[outputActivation] || activation_1.Activation.sigmoid;
+        const outputDerivativeMethod = activation_1.Activation[outputActivation + "Derivative"] || activation_1.Activation.sigmoidDerivative;
+        this.outputDerivative = (preActValue, actValue) => {
+            if (outputActivation === "sigmoid" || outputActivation === "tanh") {
+                return outputDerivativeMethod(actValue);
+            }
+            return outputDerivativeMethod(preActValue, this.activationOptions);
         };
         // Model configuration
         // Init hidden layers with the configured amount of neurons and set them to 0 at first
@@ -88,6 +100,7 @@ class CatBrain {
             this.activateLayer(output, true);
             return [output, preActLayers];
         }
+        // Activate
         this.activateLayer(output, true);
         return output;
     }
@@ -101,12 +114,14 @@ class CatBrain {
         for (let nodeIndex = 0; nodeIndex < this.outputAmount; nodeIndex++) {
             // Calculate error from expected value
             errorsOutput[nodeIndex] = target[nodeIndex] - output[nodeIndex];
+            // Pre activation output
+            const preActOutput = preActLayers[preActLayers.length - 1][nodeIndex];
             // Update weights for each output node
             for (let prevNodeIndex = 0; prevNodeIndex < this.hiddenAmounts[this.hiddenAmounts.length - 1]; prevNodeIndex++) {
                 this.outputWeights[nodeIndex][prevNodeIndex] +=
                     trainingOptions.learningRate *
                         errorsOutput[nodeIndex] *
-                        activation_1.Activation.sigmoidDerivative(output[nodeIndex]) * // Always apply sigmoid in the output layer
+                        this.outputDerivative(preActOutput, output[nodeIndex]) * // Always apply sigmoid in the output layer
                         this.hiddenLayers[this.hiddenLayers.length - 1][prevNodeIndex];
             }
             // Update bias for each output node
@@ -203,7 +218,7 @@ class CatBrain {
             // Activate
             if (isOutput) {
                 // Always apply sigmoid in the output layer
-                currentLayer[index] = activation_1.Activation.sigmoid(currentLayer[index]);
+                currentLayer[index] = this.outputActivation(currentLayer[index], this.activationOptions);
             }
             else {
                 currentLayer[index] = this.activation(currentLayer[index], this.activationOptions);

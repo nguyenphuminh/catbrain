@@ -26,7 +26,8 @@ const neuralNetwork = new CatBrain({
     learningRate: 0.02, // Learning rate, default is 0.01
     decayRate: 0.9999, // Learning decay rate for each iteration, default is 1
     shuffle: true, // Choose whether to shuffle the dataset, default is true
-    activation: "sigmoid", // sigmoid/tanh/relu/leakyRelu/swish, default is sigmoid
+    activation: "sigmoid", // sigmoid/tanh/relu/leakyRelu/swish/linear, default is sigmoid
+    outputActivation: "sigmoid", // Activation at output layer, default is sigmoid
     leakyReluAlpha: 0.01, // Alpha of leaky relu if you use it, default is 0.01
     reluClip: 5, // Relu clipping, default is 5
 
@@ -67,13 +68,14 @@ console.log(neuralNetwork.feedForward([1, 0]));
 ## Examples
 
 There are several demos available in `./examples`:
-* [MNIST digit recognition](./examples/mnist)
-* [Tictactoe winner guesser](./examples/tictactoe.js)
+* [MNIST digit recognition](https://github.com/nguyenphuminh/catbrain/tree/main/examples/mnist)
+* [Tictactoe winner guesser](https://github.com/nguyenphuminh/catbrain/blob/main/examples/tictactoe.js)
 
 ## Todos
 
 Currently what I have in mind are:
 
+* Option to configure each layer independently.
 * Code refactoring and optimization.
 * More activation functions.
 * GPU acceleration.

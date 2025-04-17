@@ -16,6 +16,7 @@ export interface CatBrainOptions {
     outputWeights?: number[][];
     outputBias?: number[];
     activation?: string;
+    outputActivation?: string;
     leakyReluAlpha?: number;
     reluClip?: number;
     learningRate?: number;
@@ -30,8 +31,10 @@ export declare class CatBrain {
     decayRate: number;
     shuffle: boolean;
     activationOptions: ActivationOptions;
-    activation: Function;
-    derivative: Function;
+    activation: (x: number, options: ActivationOptions) => number;
+    derivative: (preActValue: number, actValue: number) => number;
+    outputActivation: (x: number, options: ActivationOptions) => number;
+    outputDerivative: (preActValue: number, actValue: number) => number;
     hiddenLayers: number[][];
     hiddenWeights: number[][][];
     hiddenBiases: number[][];

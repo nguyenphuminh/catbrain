@@ -1,7 +1,7 @@
 {
   "name": "catbrain",
-  "version": "0.1.10",
-  "description": "An experimental neural network framework",
+  "version": "0.1.11",
+  "description": "Neural networks made simple for Javascript",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,7 +11,17 @@
     "url": "git+https://github.com/nguyenphuminh/catbrain.git"
   },
   "keywords": [
-    "neural-network"
+    "neural-network",
+    "machine-learning",
+    "deep-learning",
+    "ai",
+    "ml",
+    "mlp",
+    "library",
+    "framework",
+    "node",
+    "easy-to-use",
+    "catbrain"
   ],
   "author": "nguyenphuminh",
   "license": "GPL-3.0",

@@ -60,4 +60,14 @@ export class Activation {
 
         return -options.reluClip < x && x < options.reluClip ? sigmoid + x * sigmoid * (1 - sigmoid) : 0;
     }
+
+    // No activation
+    static linear(x: number) {
+        return x;
+    }
+
+    // No activation's derivative is just 1
+    static linearDerivative() {
+        return 1;
+    }
 }

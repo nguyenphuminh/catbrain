@@ -25,6 +25,7 @@ export interface CatBrainOptions {
 
     // Activation configuration
     activation?: string;
+    outputActivation?: string;
     leakyReluAlpha?: number;
     reluClip?: number;
 
@@ -44,8 +45,10 @@ export class CatBrain {
     public shuffle: boolean; // Choose whether to shuffle dataset when training
 
     public activationOptions: ActivationOptions;
-    public activation: Function;
-    public derivative: Function;
+    public activation: (x: number, options: ActivationOptions) => number;
+    public derivative: (preActValue: number, actValue: number) => number;
+    public outputActivation: (x: number, options: ActivationOptions) => number;
+    public outputDerivative: (preActValue: number, actValue: number) => number;
 
     public hiddenLayers: number[][];
     public hiddenWeights: number[][][];
@@ -59,6 +62,9 @@ export class CatBrain {
         this.inputAmount = options.inputAmount;
         this.hiddenAmounts = options.hiddenAmounts;
         this.outputAmount = options.outputAmount;
+
+
+        // Training configuration
         this.learningRate = options.learningRate || 0.01;
         this.decayRate = options.decayRate || 1;
         this.shuffle = options.shuffle ?? true;
@@ -69,6 +75,7 @@ export class CatBrain {
             leakyReluAlpha: options.leakyReluAlpha || 0.01,
             reluClip: options.reluClip || 5
         }
+
         const activation = options.activation || "sigmoid";
         this.activation = (Activation as Record<string, any>)[activation] || Activation.sigmoid;
         const derivativeMethod = (Activation as Record<string, any>)[activation + "Derivative"] || Activation.sigmoidDerivative;
@@ -78,6 +85,17 @@ export class CatBrain {
             }
 
             return derivativeMethod(preActValue, this.activationOptions);
+        };
+
+        const outputActivation = options.outputActivation || "sigmoid";
+        this.outputActivation = (Activation as Record<string, any>)[outputActivation] || Activation.sigmoid;
+        const outputDerivativeMethod = (Activation as Record<string, any>)[outputActivation + "Derivative"] || Activation.sigmoidDerivative;
+        this.outputDerivative = (preActValue: number, actValue: number) => {
+            if (outputActivation === "sigmoid" || outputActivation === "tanh") {
+                return outputDerivativeMethod(actValue);
+            }
+
+            return outputDerivativeMethod(preActValue, this.activationOptions);
         };
 
 
@@ -160,7 +178,9 @@ export class CatBrain {
             return [output, preActLayers];
         }
 
+        // Activate
         this.activateLayer(output, true);
+
         return output;
     }
 
@@ -178,12 +198,15 @@ export class CatBrain {
             // Calculate error from expected value
             errorsOutput[nodeIndex] = target[nodeIndex] - output[nodeIndex];
 
+            // Pre activation output
+            const preActOutput = preActLayers[preActLayers.length-1][nodeIndex];
+
             // Update weights for each output node
             for (let prevNodeIndex = 0; prevNodeIndex < this.hiddenAmounts[this.hiddenAmounts.length - 1]; prevNodeIndex++) {
                 this.outputWeights[nodeIndex][prevNodeIndex] +=
                     trainingOptions.learningRate *
                     errorsOutput[nodeIndex] *
-                    Activation.sigmoidDerivative(output[nodeIndex]) * // Always apply sigmoid in the output layer
+                    this.outputDerivative(preActOutput, output[nodeIndex]) * // Always apply sigmoid in the output layer
                     this.hiddenLayers[this.hiddenLayers.length - 1][prevNodeIndex];
             }
 
@@ -309,7 +332,7 @@ export class CatBrain {
             // Activate
             if (isOutput) {
                 // Always apply sigmoid in the output layer
-                currentLayer[index] = Activation.sigmoid(currentLayer[index]);
+                currentLayer[index] = this.outputActivation(currentLayer[index], this.activationOptions);
             } else {
                 currentLayer[index] = this.activation(currentLayer[index], this.activationOptions);
             }
