@@ -11,10 +11,9 @@ const testSet = set.test;
 
 // Create a CatBrain instance
 const neuralNetwork = new CatBrain({
-    inputAmount: 784, 
-    hiddenAmounts: [ 256, 256, 256 ], 
-    outputAmount: 10,
-    learningRate: 0.001
+    layers: [ 784, 256, 256, 256, 10 ], 
+    learningRate: 0.001,
+    // activation: "relu"
 });
 
 // Train
@@ -27,7 +26,8 @@ console.log(`Training ended in ${Date.now() - start}ms`);
 console.log(`Accuracy: ${calculateAccuracy(testSet) * 100}%`);
 
 // Export the model for use in the future
-delete neuralNetwork["hiddenLayers"];
+delete neuralNetwork["layerValues"];
+delete neuralNetwork["errors"];
 fs.writeFileSync("./newModel.json", JSON.stringify(neuralNetwork));
 console.log("Model exported to \"newModel.json\"");
 
@@ -49,9 +49,21 @@ function normalizeSet(dataSet) {
 
 function calculateAccuracy(testSet) {
     return testSet.filter(testObject => {
-        const expectedOutput = JSON.stringify(testObject.output);
-        const actualOutput = JSON.stringify(neuralNetwork.feedForward(testObject.input).map(el => Math.round(el)));
+        const expectedOutput = testObject.output;
+        const actualOutput = neuralNetwork.feedForward(testObject.input);
 
-        return expectedOutput === actualOutput;
+        let expectedLabel = expectedOutput.indexOf(1);
+
+        let actualLabel = 0;
+        let actualValue = actualOutput[0];
+
+        for (let index = 1; index < actualOutput.length; index++) {
+            if (actualValue < actualOutput[index]) {
+                actualValue = actualOutput[index];
+                actualLabel = index;
+            }
+        }
+
+        return actualLabel === expectedLabel;
     }).length / testSet.length;
 }
