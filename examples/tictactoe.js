@@ -2,9 +2,7 @@ const { CatBrain } = require("../dist/core");
 
 // Try to see who wins in a won position of a tictactoe game from a set of 32 games
 const neuralNetwork = new CatBrain({
-    inputAmount: 9, 
-    hiddenAmounts: [6], 
-    outputAmount: 1,
+    layers: [9, 6, 1],
     learningRate: 0.01
 });
 
@@ -66,4 +64,3 @@ _ X _
 O _ X
 `);
 console.log("Winner:", Math.round(neuralNetwork.feedForward([ 1, 0, -1, 0, 1, 0, -1, 0, 1 ])[0]) ? "X" : "O");
-
