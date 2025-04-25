@@ -17,10 +17,8 @@ const { CatBrain } = require("catbrain");
 
 // Create a neural network
 const neuralNetwork = new CatBrain({
-    // Required
-    inputAmount: 2, // Amount of input nodes
-    hiddenAmounts: [3], // Amount of nodes for each hidden layer
-    outputAmount: 1, // Amount of output nodes
+    // Init layers with their size, the first and last are input and output layers
+    layers: [2, 3, 1]
 
     // Optional config
     learningRate: 0.02, // Learning rate, default is 0.01
@@ -32,10 +30,8 @@ const neuralNetwork = new CatBrain({
     reluClip: 5, // Relu clipping, applied in activation functions reaching infinity, default is 5
 
     // Options to load existing models, randomly initialized if not provided
-    // hiddenWeights: number[][][],
-    // hiddenBiases: number[][],
-    // outputWeights: number[][],
-    // outputBias: number[]
+    // weights: number[][][],
+    // biases: number[][]
 });
 
 // Train

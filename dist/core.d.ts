@@ -8,13 +8,9 @@ export interface TrainingOptions {
     callback?: (trainingStatus: TrainingStatus) => void;
 }
 export interface CatBrainOptions {
-    inputAmount: number;
-    hiddenAmounts: number[];
-    outputAmount: number;
-    hiddenWeights?: number[][][];
-    hiddenBiases?: number[][];
-    outputWeights?: number[][];
-    outputBias?: number[];
+    layers: number[];
+    weights?: number[][][];
+    biases?: number[][];
     activation?: string;
     outputActivation?: string;
     leakyReluAlpha?: number;
@@ -24,9 +20,11 @@ export interface CatBrainOptions {
     shuffle?: boolean;
 }
 export declare class CatBrain {
-    inputAmount: number;
-    hiddenAmounts: number[];
-    outputAmount: number;
+    layers: number[];
+    layerValues: number[][];
+    weights: number[][][];
+    biases: number[][];
+    errors: number[][];
     learningRate: number;
     decayRate: number;
     shuffle: boolean;
@@ -35,11 +33,6 @@ export declare class CatBrain {
     derivative: (preActValue: number, actValue: number) => number;
     outputActivation: (x: number, options: ActivationOptions) => number;
     outputDerivative: (preActValue: number, actValue: number) => number;
-    hiddenLayers: number[][];
-    hiddenWeights: number[][][];
-    hiddenBiases: number[][];
-    outputWeights: number[][];
-    outputBias: number[];
     constructor(options: CatBrainOptions);
     feedForward(inputs: number[]): number[];
     feedForward(inputs: number[], getPreActivation: boolean): [number[], number[][]];

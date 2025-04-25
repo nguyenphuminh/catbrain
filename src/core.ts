@@ -12,16 +12,12 @@ export interface TrainingOptions {
 }
 
 export interface CatBrainOptions {
-    // Amount of neurons
-    inputAmount: number;
-    hiddenAmounts: number[];
-    outputAmount: number;
+    // Layer config
+    layers: number[];
 
     // Self-submit weights and biases
-    hiddenWeights?: number[][][];
-    hiddenBiases?: number[][];
-    outputWeights?: number[][];
-    outputBias?: number[];
+    weights?: number[][][];
+    biases?: number[][];
 
     // Activation configuration
     activation?: string;
@@ -36,13 +32,15 @@ export interface CatBrainOptions {
 }
 
 export class CatBrain {
-    public inputAmount: number; // Amount of input nodes
-    public hiddenAmounts: number[]; // Amount of hidden nodes in each hidden layer
-    public outputAmount: number; // Amount of output nodes
+    public layers: number[];
+    public layerValues: number[][];
+    public weights: number[][][];
+    public biases: number[][];
+    public errors: number[][];
 
     public learningRate: number;
     public decayRate: number;
-    public shuffle: boolean; // Choose whether to shuffle dataset when training
+    public shuffle: boolean;
 
     public activationOptions: ActivationOptions;
     public activation: (x: number, options: ActivationOptions) => number;
@@ -50,20 +48,7 @@ export class CatBrain {
     public outputActivation: (x: number, options: ActivationOptions) => number;
     public outputDerivative: (preActValue: number, actValue: number) => number;
 
-    public hiddenLayers: number[][];
-    public hiddenWeights: number[][][];
-    public hiddenBiases: number[][];
-
-    public outputWeights: number[][];
-    public outputBias: number[];
-
     constructor(options: CatBrainOptions) {
-        // Basic configuration
-        this.inputAmount = options.inputAmount;
-        this.hiddenAmounts = options.hiddenAmounts;
-        this.outputAmount = options.outputAmount;
-
-
         // Training configuration
         this.learningRate = options.learningRate || 0.01;
         this.decayRate = options.decayRate || 1;
@@ -100,34 +85,23 @@ export class CatBrain {
 
 
         // Model configuration
+        this.layers = options.layers;
 
-        // Init hidden layers with the configured amount of neurons and set them to 0 at first
-        this.hiddenLayers = this.hiddenAmounts.map(hiddenAmount => new Array(hiddenAmount).fill(0));
+        // Init layers with the configured size and set them to 0s at first
+        this.layerValues = this.layers.map(layerSize => new Array(layerSize).fill(0));
         // Init a list of randomized weights for each node of each layer
-        this.hiddenWeights = options.hiddenWeights || Array.from({ length: this.hiddenLayers.length }, (hiddenLayer, layerIndex) => {
-            return Array.from({ length: this.hiddenAmounts[layerIndex] }, (hiddenNode, nodeIndex) => {
+        this.weights = options.weights || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+            return Array.from({ length: this.layers[layerIndex] }, () => {
                 // Amount of weights of a node is the number of nodes of the previous layer
-                if (layerIndex === 0) {
-                    return Array.from({ length: this.inputAmount }, () => Math.random() * 2 - 1);
-                } else {
-                    return Array.from({ length: this.hiddenAmounts[layerIndex - 1] }, () => Math.random() * 2 - 1);
-                }
+                return Array.from({ length: this.layers[layerIndex - 1] }, () => Math.random() * 2 - 1);
             })
         });
         // Init a list of biases for each node of each layer
-        this.hiddenBiases = options.hiddenBiases || Array.from({ length: this.hiddenLayers.length }, (hiddenLayer, layerIndex) => {
-            return new Array(this.hiddenAmounts[layerIndex]).fill(0);
+        this.biases = options.biases || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+            return new Array(this.layers[layerIndex]).fill(0);
         });
-
-
-        // Output configuration
-
-        // Init a list of weights targetting the node of that position in the output layer
-        this.outputWeights = options.outputWeights || Array.from({ length: this.outputAmount }, () =>
-            Array.from({ length: this.hiddenAmounts[this.hiddenAmounts.length - 1] }, () => Math.random() * 2 - 1)
-        );
-        // Init a list of bias for each output node
-        this.outputBias = options.outputBias || new Array(this.outputAmount).fill(0);
+        // Errors cache
+        this.errors = Array.from({ length: this.layers.length }, (layer, layerIndex) => new Array(this.layers[layerIndex]).fill(0));
     }
 
 
@@ -140,46 +114,29 @@ export class CatBrain {
     feedForward(inputs: number[], getPreActivation?: boolean) {
         const preActLayers = [];
 
+        // Feed new inputs to our first (input) layer
+        this.layerValues[0] = inputs;
+
         // Propagate hidden layers with layers behind them
-        for (let index = 0; index < this.hiddenLayers.length; index++) {
+        for (let index = 1; index < this.layers.length; index++) {
             // Get sum
             this.weighedSum(
-                this.hiddenLayers[index],
-                this.hiddenWeights[index],
-                this.hiddenBiases[index],
-                index === 0 ? inputs : this.hiddenLayers[index - 1]
+                this.layerValues[index],
+                this.weights[index],
+                this.biases[index],
+                this.layerValues[index - 1]
             );
 
             // Push a copy
-            if (getPreActivation) preActLayers.push([...this.hiddenLayers[index]]);
+            if (getPreActivation) preActLayers.push([...this.layerValues[index]]);
 
             // Activate
-            this.activateLayer(this.hiddenLayers[index]);
+            this.activateLayer(this.layerValues[index], index === this.layers.length-1);
         }
 
-        // Propagate output from the last hidden layer
-        const output = new Array(this.outputAmount);
+        const output = this.layerValues[this.layerValues.length-1];
 
-        // Get sum
-        this.weighedSum(
-            output,
-            this.outputWeights,
-            this.outputBias,
-            this.hiddenLayers[this.hiddenLayers.length - 1]
-        );
-
-        if (getPreActivation) {
-            // Push a copy
-            preActLayers.push([...output]);
-
-            // Activate
-            this.activateLayer(output, true)
-
-            return [output, preActLayers];
-        }
-
-        // Activate
-        this.activateLayer(output, true);
+        if (getPreActivation) return [output, preActLayers];
 
         return output;
     }
@@ -189,79 +146,40 @@ export class CatBrain {
             learningRate: options?.learningRate || this.learningRate
         }
 
-        const [output, preActLayers] = this.feedForward(inputs, true);
+        const [output, preActLayers] = this.feedForward(inputs, true);        
 
-        const errorsOutput = new Array(this.outputAmount).fill(0);
-        const errorsHidden = Array.from({ length: this.hiddenAmounts.length }, () => new Array(this.hiddenAmounts[0]).fill(0));
+        for (let layer = this.layers.length - 1; layer >= 1; layer--) {
+            const derivative = layer === this.layers.length - 1 ? this.outputDerivative : this.derivative;
 
-        for (let nodeIndex = 0; nodeIndex < this.outputAmount; nodeIndex++) {
-            // Calculate error from expected value
-            errorsOutput[nodeIndex] = target[nodeIndex] - output[nodeIndex];
+            for (let nodeIndex = 0; nodeIndex < this.layers[layer]; nodeIndex++) {
+                // Wipe error
+                this.errors[layer][nodeIndex] = 0;
 
-            // Pre activation output
-            const preActOutput = preActLayers[preActLayers.length-1][nodeIndex];
-
-            // Update weights for each output node
-            for (let prevNodeIndex = 0; prevNodeIndex < this.hiddenAmounts[this.hiddenAmounts.length - 1]; prevNodeIndex++) {
-                this.outputWeights[nodeIndex][prevNodeIndex] +=
-                    trainingOptions.learningRate *
-                    errorsOutput[nodeIndex] *
-                    this.outputDerivative(preActOutput, output[nodeIndex]) * // Always apply sigmoid in the output layer
-                    this.hiddenLayers[this.hiddenLayers.length - 1][prevNodeIndex];
-            }
-
-            // Update bias for each output node
-            this.outputBias[nodeIndex] += trainingOptions.learningRate * errorsOutput[nodeIndex];
-        }
-
-        // Backpropagate from hidden layer to hidden layer
-        for (let hiddenLayer = this.hiddenLayers.length - 1; hiddenLayer >= 0; hiddenLayer--) {
-            for (let nodeIndex = 0; nodeIndex < this.hiddenAmounts[hiddenLayer]; nodeIndex++) {
-                // We will calculate the hidden errors first
-                errorsHidden[hiddenLayer][nodeIndex] = 0;
-
-                // If hidden layer is close to output, calculate hidden errors from output errors
-                if (hiddenLayer === this.hiddenLayers.length - 1) {
-                    for (let outputIndex = 0; outputIndex < this.outputAmount; outputIndex++) {
-                        errorsHidden[hiddenLayer][nodeIndex] +=
-                            this.outputWeights[outputIndex][nodeIndex] *
-                            errorsOutput[outputIndex];
-                    }
-                    // Or else calculate from the next hidden layer's errors
-                } else {
-                    for (let nextNodeIndex = 0; nextNodeIndex < this.hiddenAmounts[hiddenLayer + 1]; nextNodeIndex++) {
-                        errorsHidden[hiddenLayer][nodeIndex] +=
-                            this.hiddenWeights[hiddenLayer + 1][nextNodeIndex][nodeIndex] *
-                            errorsHidden[hiddenLayer + 1][nextNodeIndex];
+                // Output layer error
+                if (layer === this.layers.length - 1) {
+                    this.errors[layer][nodeIndex] = target[nodeIndex] - output[nodeIndex];
+                }
+                // Hidden layer error
+                else {
+                    for (let nextNodeIndex = 0; nextNodeIndex < this.layers[layer + 1]; nextNodeIndex++) {
+                        this.errors[layer][nodeIndex] +=
+                            this.weights[layer + 1][nextNodeIndex][nodeIndex] *
+                            this.errors[layer + 1][nextNodeIndex];
                     }
                 }
 
-                // Update weights for each hidden node
-                for (let prevNodeIndex = 0; prevNodeIndex < this.hiddenAmounts[hiddenLayer - 1]; prevNodeIndex++) {
-                    this.hiddenWeights[hiddenLayer][nodeIndex][prevNodeIndex] +=
+                // Update weights for each node
+                for (let prevNodeIndex = 0; prevNodeIndex < this.layers[layer - 1]; prevNodeIndex++) {
+                    this.weights[layer][nodeIndex][prevNodeIndex] +=
                         trainingOptions.learningRate *
-                        errorsHidden[hiddenLayer][nodeIndex] *
-                        this.derivative(preActLayers[hiddenLayer][nodeIndex], this.hiddenLayers[hiddenLayer][nodeIndex]) *
-                        this.hiddenLayers[hiddenLayer - 1][prevNodeIndex];
+                        this.errors[layer][nodeIndex] *
+                        derivative(preActLayers[layer - 1][nodeIndex], this.layerValues[layer][nodeIndex]) *
+                        this.layerValues[layer - 1][prevNodeIndex];
                 }
 
-                // Update bias for each hidden node
-                this.hiddenBiases[hiddenLayer][nodeIndex] += trainingOptions.learningRate * errorsHidden[hiddenLayer][nodeIndex];
+                // Update bias for each node
+                this.biases[layer][nodeIndex] += trainingOptions.learningRate * this.errors[layer][nodeIndex];
             }
-        }
-
-        // Backpropagate from hidden layer to input layer
-        for (let nodeIndex = 0; nodeIndex < this.hiddenAmounts[0]; nodeIndex++) {
-            // Update weights for each hidden node in first hidden layer
-            for (let prevNodeIndex = 0; prevNodeIndex < this.inputAmount; prevNodeIndex++) {
-                this.hiddenWeights[0][nodeIndex][prevNodeIndex] +=
-                    trainingOptions.learningRate *
-                    errorsHidden[0][nodeIndex] *
-                    this.derivative(preActLayers[0][nodeIndex], this.hiddenLayers[0][nodeIndex]) *
-                    inputs[prevNodeIndex];
-            }
-
-            // We don't need to update bias here because it's already done in the previous loop
         }
     }
 
