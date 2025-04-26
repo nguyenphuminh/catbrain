@@ -118,20 +118,23 @@ export class CatBrain {
         this.layerValues[0] = inputs;
 
         // Propagate hidden layers with layers behind them
-        for (let index = 1; index < this.layers.length; index++) {
+        for (let index = 1; index < this.layerValues.length; index++) {
+            // Init
+            const currentLayer = this.layerValues[index];
+
             // Get sum
             this.weighedSum(
-                this.layerValues[index],
+                currentLayer,
                 this.weights[index],
                 this.biases[index],
                 this.layerValues[index - 1]
             );
 
             // Push a copy
-            if (getPreActivation) preActLayers.push([...this.layerValues[index]]);
+            if (getPreActivation) preActLayers.push([...currentLayer]);
 
             // Activate
-            this.activateLayer(this.layerValues[index], index === this.layers.length-1);
+            this.activateLayer(currentLayer, index === this.layers.length-1);
         }
 
         const output = this.layerValues[this.layerValues.length-1];
@@ -146,17 +149,24 @@ export class CatBrain {
             learningRate: options?.learningRate || this.learningRate
         }
 
-        const [output, preActLayers] = this.feedForward(inputs, true);        
+        const [output, preActLayers] = this.feedForward(inputs, true);
 
-        for (let layer = this.layers.length - 1; layer >= 1; layer--) {
-            const derivative = layer === this.layers.length - 1 ? this.outputDerivative : this.derivative;
+        const lastLayer = this.layerValues.length - 1;
 
+        for (let layer = lastLayer; layer >= 1; layer--) {
             for (let nodeIndex = 0; nodeIndex < this.layers[layer]; nodeIndex++) {
-                // Wipe error
+                // Calculate derivative ahead of time
+                const preActNeuron = preActLayers[layer - 1][nodeIndex]; // layer - 1 because this does not have pre-act input layer
+                const actNeuron = this.layerValues[layer][nodeIndex];
+                const derivative = layer === lastLayer ? 
+                                   this.outputDerivative(preActNeuron, actNeuron) :
+                                   this.derivative(preActNeuron, actNeuron);
+
+                // Calculate error
                 this.errors[layer][nodeIndex] = 0;
 
                 // Output layer error
-                if (layer === this.layers.length - 1) {
+                if (layer === lastLayer) {
                     this.errors[layer][nodeIndex] = target[nodeIndex] - output[nodeIndex];
                 }
                 // Hidden layer error
@@ -165,7 +175,7 @@ export class CatBrain {
                         this.errors[layer][nodeIndex] +=
                             this.weights[layer + 1][nextNodeIndex][nodeIndex] *
                             this.errors[layer + 1][nextNodeIndex];
-                    }
+                    }   
                 }
 
                 // Update weights for each node
@@ -173,7 +183,7 @@ export class CatBrain {
                     this.weights[layer][nodeIndex][prevNodeIndex] +=
                         trainingOptions.learningRate *
                         this.errors[layer][nodeIndex] *
-                        derivative(preActLayers[layer - 1][nodeIndex], this.layerValues[layer][nodeIndex]) *
+                        derivative *
                         this.layerValues[layer - 1][prevNodeIndex];
                 }
 
