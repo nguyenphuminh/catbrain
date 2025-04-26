@@ -18,7 +18,7 @@ const { CatBrain } = require("catbrain");
 // Create a neural network
 const neuralNetwork = new CatBrain({
     // Init layers with their size, the first and last are input and output layers
-    layers: [2, 3, 1]
+    layers: [2, 3, 1],
 
     // Optional config
     learningRate: 0.02, // Learning rate, default is 0.01
