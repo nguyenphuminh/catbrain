@@ -66,12 +66,32 @@ class Activation {
     // Softplus for activation
     static softplus(x, options) {
         if (x > options.reluClip)
-            return Math.log(1 + Math.exp(options.reluClip));
-        return Math.log(1 + Math.exp(x));
+            return Math.log1p(Math.exp(options.reluClip));
+        return Math.log1p(Math.exp(x));
     }
     // Softplus derivative
     static softplusDerivative(x, options) {
         return x < options.reluClip ? 1 / (1 + Math.exp(-x)) : 0;
+    }
+    // Mish
+    static mish(x, options) {
+        if (x > options.reluClip) {
+            return options.reluClip * Math.tanh(Math.log1p(Math.exp(options.reluClip)));
+        }
+        else if (x < -options.reluClip) {
+            return -options.reluClip * Math.tanh(Math.log1p(Math.exp(-options.reluClip)));
+        }
+        return x * Math.tanh(Math.log1p(Math.exp(x)));
+    }
+    // Mish derivative
+    static mishDerivative(x, options) {
+        if (x > options.reluClip || x < -options.reluClip)
+            return 0;
+        const softplus = Math.log1p(Math.exp(x));
+        const tanhSoftplus = Math.tanh(softplus);
+        const sigmoid = 1 / (1 + Math.exp(-x));
+        const sech2Softplus = 1 - tanhSoftplus * tanhSoftplus;
+        return tanhSoftplus + x * sech2Softplus * sigmoid;
     }
     // No activation
     static linear(x) {
