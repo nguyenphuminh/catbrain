@@ -41,6 +41,4 @@ export declare class CatBrain {
         inputs: number[];
         outputs: number[];
     }[], options?: TrainingOptions): void;
-    weighedSum(currentLayer: number[], currentWeights: number[][], currentBiases: number[], prevLayer: number[]): void;
-    activateLayer(currentLayer: number[], isOutput?: boolean): void;
 }
