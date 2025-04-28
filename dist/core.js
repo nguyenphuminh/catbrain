@@ -2,61 +2,76 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CatBrain = void 0;
 const activation_1 = require("./activation");
+const rand_1 = require("./rand");
 const utils_1 = require("./utils");
 class CatBrain {
+    // Mostly for external use
     layers;
-    layerValues;
-    preActLayerValues;
     weights;
     biases;
-    errors;
+    weightInit;
+    activation;
+    outputActivation;
+    leakyReluAlpha;
+    reluClip;
     learningRate;
     decayRate;
     shuffle;
+    // Mostly for internal use
+    activationFunc;
+    derivativeFunc;
+    outputActivationFunc;
+    outputDerivativeFunc;
+    layerValues;
+    preActLayerValues;
+    errors;
     activationOptions;
-    activation;
-    derivative;
-    outputActivation;
-    outputDerivative;
     constructor(options) {
         // Training configuration
         this.learningRate = options.learningRate || 0.01;
         this.decayRate = options.decayRate || 1;
         this.shuffle = options.shuffle ?? true;
         // Activation function configuration
+        this.leakyReluAlpha = options.leakyReluAlpha || 0.01;
+        this.reluClip = options.reluClip || 5;
         this.activationOptions = {
-            leakyReluAlpha: options.leakyReluAlpha || 0.01,
-            reluClip: options.reluClip || 5
+            leakyReluAlpha: this.leakyReluAlpha,
+            reluClip: this.reluClip
         };
-        const activation = options.activation || "sigmoid";
-        this.activation = activation_1.Activation[activation] || activation_1.Activation.sigmoid;
-        const derivativeMethod = activation_1.Activation[activation + "Derivative"] || activation_1.Activation.sigmoidDerivative;
-        this.derivative = (preActValue, actValue) => {
-            if (activation === "sigmoid" || activation === "tanh") {
+        this.activation = options.activation || "relu";
+        this.activationFunc = activation_1.Activation[this.activation] || activation_1.Activation.sigmoid;
+        const derivativeMethod = activation_1.Activation[this.activation + "Derivative"] || activation_1.Activation.sigmoidDerivative;
+        this.derivativeFunc = (preActValue, actValue) => {
+            if (this.activation === "sigmoid" || this.activation === "tanh") {
                 return derivativeMethod(actValue);
             }
             return derivativeMethod(preActValue, this.activationOptions);
         };
-        const outputActivation = options.outputActivation || "sigmoid";
-        this.outputActivation = activation_1.Activation[outputActivation] || activation_1.Activation.sigmoid;
-        const outputDerivativeMethod = activation_1.Activation[outputActivation + "Derivative"] || activation_1.Activation.sigmoidDerivative;
-        this.outputDerivative = (preActValue, actValue) => {
-            if (outputActivation === "sigmoid" || outputActivation === "tanh") {
+        this.outputActivation = options.outputActivation || "sigmoid";
+        this.outputActivationFunc = activation_1.Activation[this.outputActivation] || activation_1.Activation.sigmoid;
+        const outputDerivativeMethod = activation_1.Activation[this.outputActivation + "Derivative"] || activation_1.Activation.sigmoidDerivative;
+        this.outputDerivativeFunc = (preActValue, actValue) => {
+            if (this.outputActivation === "sigmoid" || this.outputActivation === "tanh") {
                 return outputDerivativeMethod(actValue);
             }
             return outputDerivativeMethod(preActValue, this.activationOptions);
         };
         // Model configuration
         this.layers = options.layers;
+        // Choose weight init function
+        this.weightInit = options.weightInit || rand_1.weightInitWithAct[this.activation] || "basicUniform";
+        const weightInit = rand_1.Rand[this.weightInit];
         // Init layers with the configured size and set them to 0s at first
         this.layerValues = this.layers.map(layerSize => new Array(layerSize).fill(0));
         // Init preactivation layers
         this.preActLayerValues = this.layers.map(layerSize => new Array(layerSize).fill(0));
         // Init a list of randomized weights for each node of each layer
         this.weights = options.weights || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
-            return Array.from({ length: this.layers[layerIndex] }, () => {
+            const outSize = this.layers[layerIndex];
+            return Array.from({ length: outSize }, () => {
+                const inSize = this.layers[layerIndex - 1];
                 // Amount of weights of a node is the number of nodes of the previous layer
-                return Array.from({ length: this.layers[layerIndex - 1] }, () => Math.random() * 2 - 1);
+                return Array.from({ length: inSize }, () => weightInit(inSize, outSize));
             });
         });
         // Init a list of biases for each node of each layer
@@ -65,7 +80,7 @@ class CatBrain {
         });
         // Errors cache
         this.errors = Array.from({ length: this.layers.length }, (layer, layerIndex) => new Array(this.layers[layerIndex]).fill(0));
-        // Input weights, biases and pre-act values are non-existent
+        // Input weights, biases and pre-act values are non-existent, this is me being lazy
         this.preActLayerValues[0] = null;
         this.weights[0] = null;
         this.biases[0] = null;
@@ -94,12 +109,12 @@ class CatBrain {
                     const prevNode = prevLayer[prevIndex];
                     preActCurrentLayer[index] += weight * prevNode;
                 }
+                // Activate
                 if (isOutput) {
-                    // Always apply sigmoid in the output layer
-                    currentLayer[index] = this.outputActivation(preActCurrentLayer[index], this.activationOptions);
+                    currentLayer[index] = this.outputActivationFunc(preActCurrentLayer[index], this.activationOptions);
                 }
                 else {
-                    currentLayer[index] = this.activation(preActCurrentLayer[index], this.activationOptions);
+                    currentLayer[index] = this.activationFunc(preActCurrentLayer[index], this.activationOptions);
                 }
             }
         }
@@ -117,8 +132,8 @@ class CatBrain {
                 const preActNeuron = this.preActLayerValues[layer][nodeIndex]; // layer - 1 because this does not have pre-act input layer
                 const actNeuron = this.layerValues[layer][nodeIndex];
                 const derivative = layer === lastLayer ?
-                    this.outputDerivative(preActNeuron, actNeuron) :
-                    this.derivative(preActNeuron, actNeuron);
+                    this.outputDerivativeFunc(preActNeuron, actNeuron) :
+                    this.derivativeFunc(preActNeuron, actNeuron);
                 // Calculate error
                 this.errors[layer][nodeIndex] = 0;
                 // Output layer error
