@@ -12,22 +12,24 @@ const testSet = set.test;
 // Create a CatBrain instance
 const neuralNetwork = new CatBrain({
     layers: [ 784, 256, 256, 256, 10 ], 
-    learningRate: 0.001,
-    // activation: "relu"
+    learningRate: 0.001
 });
 
 // Train
-const start = Date.now();
+const start = performance.now();
 console.log("Training...");
 neuralNetwork.train(300000, normalizeSet(trainingSet));
-console.log(`Training ended in ${Date.now() - start}ms`);
+console.log(`Training ended in ${performance.now() - start}ms`);
 
 // Calculate accuracy
+const startTest = performance.now();
 console.log(`Accuracy: ${calculateAccuracy(testSet) * 100}%`);
+console.log(`Testing ended in ${performance.now() - startTest}ms`);
 
 // Export the model for use in the future
 delete neuralNetwork["layerValues"];
 delete neuralNetwork["errors"];
+delete neuralNetwork["preActLayerValues"];
 fs.writeFileSync("./newModel.json", JSON.stringify(neuralNetwork));
 console.log("Model exported to \"newModel.json\"");
 
