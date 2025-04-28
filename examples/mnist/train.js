@@ -23,6 +23,7 @@ console.log(`Training ended in ${performance.now() - start}ms`);
 
 // Calculate accuracy
 const startTest = performance.now();
+console.log("Testing...");
 console.log(`Accuracy: ${calculateAccuracy(testSet) * 100}%`);
 console.log(`Testing ended in ${performance.now() - startTest}ms`);
 
@@ -30,6 +31,7 @@ console.log(`Testing ended in ${performance.now() - startTest}ms`);
 delete neuralNetwork["layerValues"];
 delete neuralNetwork["errors"];
 delete neuralNetwork["preActLayerValues"];
+delete neuralNetwork["activationOptions"];
 fs.writeFileSync("./newModel.json", JSON.stringify(neuralNetwork));
 console.log("Model exported to \"newModel.json\"");
 
