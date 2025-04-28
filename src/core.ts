@@ -34,6 +34,7 @@ export interface CatBrainOptions {
 export class CatBrain {
     public layers: number[];
     public layerValues: number[][];
+    public preActLayerValues: number[][];
     public weights: number[][][];
     public biases: number[][];
     public errors: number[][];
@@ -89,6 +90,8 @@ export class CatBrain {
 
         // Init layers with the configured size and set them to 0s at first
         this.layerValues = this.layers.map(layerSize => new Array(layerSize).fill(0));
+        // Init preactivation layers
+        this.preActLayerValues = this.layers.map(layerSize => new Array(layerSize).fill(0));
         // Init a list of randomized weights for each node of each layer
         this.weights = options.weights || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
             return Array.from({ length: this.layers[layerIndex] }, () => {
@@ -102,6 +105,12 @@ export class CatBrain {
         });
         // Errors cache
         this.errors = Array.from({ length: this.layers.length }, (layer, layerIndex) => new Array(this.layers[layerIndex]).fill(0));
+
+        // Input weights, biases and pre-act values are non-existent, this is me being lazy
+        this.preActLayerValues[0] = null as unknown as number[];
+        this.weights[0] = null as unknown as number[][];
+        this.biases[0] = null as unknown as number[];
+        this.errors[0] = null as unknown as number[];
     }
 
 
@@ -109,11 +118,7 @@ export class CatBrain {
                                 User APIs
     //////////////////////////////////////////////////////////////*/
 
-    feedForward(inputs: number[]): number[];
-    feedForward(inputs: number[], getPreActivation: boolean): [number[], number[][]];
-    feedForward(inputs: number[], getPreActivation?: boolean) {
-        const preActLayers = [];
-
+    feedForward(inputs: number[]): number[] {
         // Feed new inputs to our first (input) layer
         this.layerValues[0] = inputs;
 
@@ -123,42 +128,31 @@ export class CatBrain {
             const weights = this.weights[index];
             const biases = this.biases[index];
             const prevLayer = this.layerValues[index - 1];
+            const isOutput = index === this.layers.length-1;
+            const preActCurrentLayer = this.preActLayerValues[index];
 
             for (let index = 0; index < currentLayer.length; index++) {
                 // Add bias
-                currentLayer[index] = biases[index];
+                preActCurrentLayer[index] = biases[index];
     
                 // Get weighed sum
                 for (let prevIndex = 0; prevIndex < prevLayer.length; prevIndex++) {
                     const weight = weights[index][prevIndex];
                     const prevNode = prevLayer[prevIndex];
     
-                    currentLayer[index] += weight * prevNode;
+                    preActCurrentLayer[index] += weight * prevNode;
                 }
-            }
 
-            // Push a copy
-            if (getPreActivation) preActLayers.push([...currentLayer]);
-
-            // Activate
-            const isOutput = index === this.layers.length-1;
-
-            for (let index = 0; index < currentLayer.length; index++) {
                 // Activate
                 if (isOutput) {
-                    // Always apply sigmoid in the output layer
-                    currentLayer[index] = this.outputActivation(currentLayer[index], this.activationOptions);
+                    currentLayer[index] = this.outputActivation(preActCurrentLayer[index], this.activationOptions);
                 } else {
-                    currentLayer[index] = this.activation(currentLayer[index], this.activationOptions);
+                    currentLayer[index] = this.activation(preActCurrentLayer[index], this.activationOptions);
                 }
             }
         }
 
-        const output = this.layerValues[this.layerValues.length-1];
-
-        if (getPreActivation) return [output, preActLayers];
-
-        return output;
+        return this.layerValues[this.layerValues.length-1];
     }
 
     backPropagate(inputs: number[], target: number[], options: TrainingOptions) {
@@ -166,14 +160,14 @@ export class CatBrain {
             learningRate: options?.learningRate || this.learningRate
         }
 
-        const [output, preActLayers] = this.feedForward(inputs, true);
+        const output = this.feedForward(inputs);
 
         const lastLayer = this.layerValues.length - 1;
 
         for (let layer = lastLayer; layer >= 1; layer--) {
             for (let nodeIndex = 0; nodeIndex < this.layers[layer]; nodeIndex++) {
                 // Calculate derivative ahead of time
-                const preActNeuron = preActLayers[layer - 1][nodeIndex]; // layer - 1 because this does not have pre-act input layer
+                const preActNeuron = this.preActLayerValues[layer][nodeIndex]; // layer - 1 because this does not have pre-act input layer
                 const actNeuron = this.layerValues[layer][nodeIndex];
                 const derivative = layer === lastLayer ? 
                                    this.outputDerivative(preActNeuron, actNeuron) :

@@ -22,6 +22,7 @@ export interface CatBrainOptions {
 export declare class CatBrain {
     layers: number[];
     layerValues: number[][];
+    preActLayerValues: number[][];
     weights: number[][][];
     biases: number[][];
     errors: number[][];
@@ -35,7 +36,6 @@ export declare class CatBrain {
     outputDerivative: (preActValue: number, actValue: number) => number;
     constructor(options: CatBrainOptions);
     feedForward(inputs: number[]): number[];
-    feedForward(inputs: number[], getPreActivation: boolean): [number[], number[][]];
     backPropagate(inputs: number[], target: number[], options: TrainingOptions): void;
     train(iterations: number, trainingData: {
         inputs: number[];
