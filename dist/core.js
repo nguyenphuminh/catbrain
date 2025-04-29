@@ -42,23 +42,23 @@ class CatBrain {
             reluClip: this.reluClip
         };
         this.activation = options.activation || "relu";
-        this.activationFunc = activation_1.Activation[this.activation] || activation_1.Activation.sigmoid;
-        const derivativeMethod = activation_1.Activation[this.activation + "Derivative"] || activation_1.Activation.sigmoidDerivative;
-        this.derivativeFunc = (preActValue, actValue) => {
-            if (this.activation === "sigmoid" || this.activation === "tanh") {
-                return derivativeMethod(actValue);
-            }
-            return derivativeMethod(preActValue, this.activationOptions);
-        };
+        this.activationFunc = activation_1.Activation[this.activation] || activation_1.Activation.relu;
+        const derivativeMethod = activation_1.Activation[this.activation + "Derivative"] || activation_1.Activation.reluDerivative;
+        if (this.activation === "sigmoid" || this.activation === "tanh") {
+            this.derivativeFunc = (preActValue, actValue) => derivativeMethod(actValue);
+        }
+        else {
+            this.derivativeFunc = (preActValue, actValue) => derivativeMethod(preActValue, this.activationOptions);
+        }
         this.outputActivation = options.outputActivation || "sigmoid";
         this.outputActivationFunc = activation_1.Activation[this.outputActivation] || activation_1.Activation.sigmoid;
         const outputDerivativeMethod = activation_1.Activation[this.outputActivation + "Derivative"] || activation_1.Activation.sigmoidDerivative;
-        this.outputDerivativeFunc = (preActValue, actValue) => {
-            if (this.outputActivation === "sigmoid" || this.outputActivation === "tanh") {
-                return outputDerivativeMethod(actValue);
-            }
-            return outputDerivativeMethod(preActValue, this.activationOptions);
-        };
+        if (this.outputActivation === "sigmoid" || this.outputActivation === "tanh") {
+            this.outputDerivativeFunc = (preActValue, actValue) => outputDerivativeMethod(actValue);
+        }
+        else {
+            this.outputDerivativeFunc = (preActValue, actValue) => outputDerivativeMethod(preActValue, this.activationOptions);
+        }
         // Model configuration
         this.layers = options.layers;
         // Choose weight init function

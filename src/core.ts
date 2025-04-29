@@ -83,26 +83,22 @@ export class CatBrain {
         }
 
         this.activation = options.activation || "relu";
-        this.activationFunc = (Activation as Record<string, any>)[this.activation] || Activation.sigmoid;
-        const derivativeMethod = (Activation as Record<string, any>)[this.activation + "Derivative"] || Activation.sigmoidDerivative;
-        this.derivativeFunc = (preActValue: number, actValue: number) => {
-            if (this.activation === "sigmoid" || this.activation === "tanh") {
-                return derivativeMethod(actValue);
-            }
-
-            return derivativeMethod(preActValue, this.activationOptions);
-        };
+        this.activationFunc = (Activation as Record<string, any>)[this.activation] || Activation.relu;
+        const derivativeMethod = (Activation as Record<string, any>)[this.activation + "Derivative"] || Activation.reluDerivative;
+        if (this.activation === "sigmoid" || this.activation === "tanh") {
+            this.derivativeFunc = (preActValue: number, actValue: number) => derivativeMethod(actValue);
+        } else {
+            this.derivativeFunc = (preActValue: number, actValue: number) => derivativeMethod(preActValue, this.activationOptions);
+        }
 
         this.outputActivation = options.outputActivation || "sigmoid";
         this.outputActivationFunc = (Activation as Record<string, any>)[this.outputActivation] || Activation.sigmoid;
         const outputDerivativeMethod = (Activation as Record<string, any>)[this.outputActivation + "Derivative"] || Activation.sigmoidDerivative;
-        this.outputDerivativeFunc = (preActValue: number, actValue: number) => {
-            if (this.outputActivation === "sigmoid" || this.outputActivation === "tanh") {
-                return outputDerivativeMethod(actValue);
-            }
-
-            return outputDerivativeMethod(preActValue, this.activationOptions);
-        };
+        if (this.outputActivation === "sigmoid" || this.outputActivation === "tanh") {
+            this.outputDerivativeFunc = (preActValue: number, actValue: number) => outputDerivativeMethod(actValue);
+        } else {
+            this.outputDerivativeFunc = (preActValue: number, actValue: number) => outputDerivativeMethod(preActValue, this.activationOptions);
+        }
 
 
         // Model configuration
