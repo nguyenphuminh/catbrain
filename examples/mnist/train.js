@@ -16,14 +16,14 @@ const neuralNetwork = new CatBrain({
 });
 
 // Train
-const start = performance.now();
 console.log("Training...");
-neuralNetwork.train(1000, normalizeSet(trainingSet));
+const start = performance.now();
+neuralNetwork.train(300000, normalizeSet(trainingSet));
 console.log(`Training ended in ${performance.now() - start}ms`);
 
 // Calculate accuracy
-const startTest = performance.now();
 console.log("Testing...");
+const startTest = performance.now();
 console.log(`Accuracy: ${calculateAccuracy(testSet) * 100}%`);
 console.log(`Testing ended in ${performance.now() - startTest}ms`);
 
