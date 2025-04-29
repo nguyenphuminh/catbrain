@@ -5,6 +5,7 @@ export interface TrainingStatus {
 export interface TrainingOptions {
     learningRate?: number;
     decayRate?: number;
+    momentum?: number;
     callback?: (trainingStatus: TrainingStatus) => void;
 }
 export interface CatBrainOptions {
@@ -16,6 +17,7 @@ export interface CatBrainOptions {
     outputActivation?: string;
     leakyReluAlpha?: number;
     reluClip?: number;
+    momentum?: number;
     learningRate?: number;
     decayRate?: number;
     shuffle?: boolean;
@@ -29,6 +31,7 @@ export declare class CatBrain {
     outputActivation: string;
     leakyReluAlpha: number;
     reluClip: number;
+    momentum: number;
     learningRate: number;
     decayRate: number;
     shuffle: boolean;
@@ -40,6 +43,7 @@ export declare class CatBrain {
     preActLayerValues: number[][];
     errors: number[][];
     activationOptions: ActivationOptions;
+    deltas: number[][][];
     constructor(options: CatBrainOptions);
     feedForward(inputs: number[]): number[];
     backPropagate(inputs: number[], target: number[], options: TrainingOptions): void;

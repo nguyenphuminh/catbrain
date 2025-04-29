@@ -26,6 +26,7 @@ const neuralNetwork = new CatBrain({
     learningRate: 0.02, // Learning rate, default is 0.01
     decayRate: 0.9999, // Learning decay rate for each iteration, default is 1
     shuffle: true, // Choose whether to shuffle the dataset, default is true
+    momentum: 0.2, // Momentum optimizer, default is 0.1
     
     // Activation config
     activation: "relu", // sigmoid/tanh/relu/leakyRelu/swish/mish/softplus/linear, default is relu
@@ -57,6 +58,7 @@ neuralNetwork.train(
     // , {
     //     learningRate: 0.02, // Will use original learning rate if not provided
     //     decayRate: 0.9999, // Will use original decay rate if not provided
+    //     momentum: 0.1, // Will use original momentum if not provided
     //     // A function called before every iteration
     //     callback: (status) => {
     //         console.log(status.iteration)

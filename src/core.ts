@@ -9,6 +9,7 @@ export interface TrainingStatus {
 export interface TrainingOptions {
     learningRate?: number;
     decayRate?: number;
+    momentum?: number;
     callback?: (trainingStatus: TrainingStatus) => void;
 }
 
@@ -28,6 +29,7 @@ export interface CatBrainOptions {
     reluClip?: number;
 
     // Training configurations
+    momentum?: number;
     learningRate?: number;
     decayRate?: number;
     shuffle?: boolean;
@@ -46,6 +48,7 @@ export class CatBrain {
     public leakyReluAlpha: number;
     public reluClip: number;
 
+    public momentum: number;
     public learningRate: number;
     public decayRate: number;
     public shuffle: boolean;
@@ -61,10 +64,11 @@ export class CatBrain {
     public preActLayerValues: number[][];
     public errors: number[][];
     public activationOptions: ActivationOptions;
-
+    public deltas: number[][][];
 
     constructor(options: CatBrainOptions) {
         // Training configuration
+        this.momentum = options.momentum || 0.1;
         this.learningRate = options.learningRate || 0.01;
         this.decayRate = options.decayRate || 1;
         this.shuffle = options.shuffle ?? true;
@@ -119,7 +123,6 @@ export class CatBrain {
             return Array.from({ length: outSize }, () => {
                 const inSize = this.layers[layerIndex - 1];
 
-                // Amount of weights of a node is the number of nodes of the previous layer
                 return Array.from({ length: inSize }, () => weightInit(inSize, outSize));
             })
         });
@@ -129,10 +132,17 @@ export class CatBrain {
         });
         // Errors cache
         this.errors = Array.from({ length: this.layers.length }, (layer, layerIndex) => new Array(this.layers[layerIndex]).fill(0));
+        // Deltas for momentum
+        this.deltas = options.weights || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+            return Array.from({ length: this.layers[layerIndex] }, () => {
+                return Array.from({ length: this.layers[layerIndex - 1] }, () => 0);
+            })
+        });
 
         // Input weights, biases and pre-act values are non-existent, this is me being lazy
         this.preActLayerValues[0] = null as unknown as number[];
         this.weights[0] = null as unknown as number[][];
+        this.deltas[0] = null as unknown as number[][];
         this.biases[0] = null as unknown as number[];
         this.errors[0] = null as unknown as number[];
     }
@@ -147,21 +157,29 @@ export class CatBrain {
         this.layerValues[0] = inputs;
 
         // Propagate layers with layers behind them
-        for (let index = 1; index < this.layerValues.length; index++) {
+        const layers = this.layerValues.length;
+
+        for (let index = 1; index < layers; index++) {
+            // Avoid lookups
             const currentLayer = this.layerValues[index];
+            const currentLayerSize = currentLayer.length;
             const weights = this.weights[index];
             const biases = this.biases[index];
             const prevLayer = this.layerValues[index - 1];
+            const prevlayerSize = prevLayer.length;
             const isOutput = index === this.layers.length-1;
             const preActCurrentLayer = this.preActLayerValues[index];
 
-            for (let index = 0; index < currentLayer.length; index++) {
+            for (let index = 0; index < currentLayerSize; index++) {
+                // Avoid lookups
+                const nodeWeights = weights[index];
+
                 // Add bias
                 preActCurrentLayer[index] = biases[index];
     
                 // Get weighed sum
-                for (let prevIndex = 0; prevIndex < prevLayer.length; prevIndex++) {
-                    const weight = weights[index][prevIndex];
+                for (let prevIndex = 0; prevIndex < prevlayerSize; prevIndex++) {
+                    const weight = nodeWeights[prevIndex];
                     const prevNode = prevLayer[prevIndex];
     
                     preActCurrentLayer[index] += weight * prevNode;
@@ -180,50 +198,66 @@ export class CatBrain {
     }
 
     backPropagate(inputs: number[], target: number[], options: TrainingOptions) {
-        const trainingOptions = {
-            learningRate: options?.learningRate || this.learningRate
-        }
-
         const output = this.feedForward(inputs);
 
+        // Avoid lookups
         const lastLayer = this.layerValues.length - 1;
+        const momentum = options?.momentum || this.momentum;
+        const learningRate = options?.learningRate || this.learningRate;
 
         for (let layer = lastLayer; layer >= 1; layer--) {
-            for (let nodeIndex = 0; nodeIndex < this.layers[layer]; nodeIndex++) {
+            // Avoid lookups
+            const nextLayerSize = this.layers[layer + 1];
+            const nextLayerWeights = this.weights[layer + 1];
+            const nextLayerErrors = this.errors[layer + 1];
+            const preActLayerValues = this.preActLayerValues[layer];
+            const layerValues = this.layerValues[layer];
+            const layerSize = this.layers[layer];
+            const layerWeights = this.weights[layer];
+            const layerBiases = this.biases[layer];
+            const layerDeltas = this.deltas[layer];
+            const layerErrors = this.errors[layer];
+            const prevLayerValues = this.layerValues[layer - 1];
+            const prevLayerSize = this.layers[layer - 1];
+            const isLastLayer = layer === lastLayer;
+
+            for (let nodeIndex = 0; nodeIndex < layerSize; nodeIndex++) {
                 // Calculate derivative ahead of time
-                const preActNeuron = this.preActLayerValues[layer][nodeIndex]; // layer - 1 because this does not have pre-act input layer
-                const actNeuron = this.layerValues[layer][nodeIndex];
-                const derivative = layer === lastLayer ? 
+                const preActNeuron = preActLayerValues[nodeIndex];
+                const actNeuron = layerValues[nodeIndex];
+                const derivative = isLastLayer ? 
                                    this.outputDerivativeFunc(preActNeuron, actNeuron) :
                                    this.derivativeFunc(preActNeuron, actNeuron);
 
                 // Calculate error
-                this.errors[layer][nodeIndex] = 0;
+                layerErrors[nodeIndex] = 0;
 
                 // Output layer error
                 if (layer === lastLayer) {
-                    this.errors[layer][nodeIndex] = target[nodeIndex] - output[nodeIndex];
+                    layerErrors[nodeIndex] = target[nodeIndex] - output[nodeIndex];
                 }
                 // Hidden layer error
                 else {
-                    for (let nextNodeIndex = 0; nextNodeIndex < this.layers[layer + 1]; nextNodeIndex++) {
-                        this.errors[layer][nodeIndex] +=
-                            this.weights[layer + 1][nextNodeIndex][nodeIndex] *
-                            this.errors[layer + 1][nextNodeIndex];
-                    }   
+                    for (let nextNodeIndex = 0; nextNodeIndex < nextLayerSize; nextNodeIndex++) {
+                        layerErrors[nodeIndex] += nextLayerWeights[nextNodeIndex][nodeIndex] * nextLayerErrors[nextNodeIndex];
+                    }
                 }
 
                 // Update weights for each node
-                for (let prevNodeIndex = 0; prevNodeIndex < this.layers[layer - 1]; prevNodeIndex++) {
-                    this.weights[layer][nodeIndex][prevNodeIndex] +=
-                        trainingOptions.learningRate *
-                        this.errors[layer][nodeIndex] *
-                        derivative *
-                        this.layerValues[layer - 1][prevNodeIndex];
+                const nodeWeights = layerWeights[nodeIndex];
+                const nodeDeltas = layerDeltas[nodeIndex];
+                const nodeError = layerErrors[nodeIndex];
+
+                for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
+                    const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
+
+                    nodeDeltas[prevNodeIndex] = momentum * nodeDeltas[prevNodeIndex] + (1 - momentum) * gradient;
+
+                    nodeWeights[prevNodeIndex] += learningRate * nodeDeltas[prevNodeIndex];
                 }
 
                 // Update bias for each node
-                this.biases[layer][nodeIndex] += trainingOptions.learningRate * this.errors[layer][nodeIndex];
+                layerBiases[nodeIndex] += learningRate * nodeError;
             }
         }
     }
@@ -235,7 +269,8 @@ export class CatBrain {
     ) {
         const trainingOptions = {
             learningRate: options?.learningRate || this.learningRate,
-            decayRate: options?.decayRate || this.decayRate
+            decayRate: options?.decayRate || this.decayRate,
+            momentum: options?.momentum || this.momentum
         }
 
         // Shuffle the dataset first
