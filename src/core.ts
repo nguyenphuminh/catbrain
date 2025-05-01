@@ -111,9 +111,15 @@ export class CatBrain {
         // Init layers with the configured size and set them to 0s at first
         this.layerValues = this.layers.map(layerSize => new Array(layerSize).fill(0));
         // Init preactivation layers
-        this.preActLayerValues = this.layers.map(layerSize => new Array(layerSize).fill(0));
+        this.preActLayerValues = Array.from({ length: this.layers.length }, (layer, layerIndex) => { 
+            if (layerIndex === 0) return null as unknown as number[];
+
+            return new Array(this.layers[layerIndex]).fill(0);
+        });
         // Init a list of randomized weights for each node of each layer
         this.weights = options.weights || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+            if (layerIndex === 0) return null as unknown as number[][];
+
             const outSize = this.layers[layerIndex];
 
             return Array.from({ length: outSize }, () => {
@@ -124,23 +130,24 @@ export class CatBrain {
         });
         // Init a list of biases for each node of each layer
         this.biases = options.biases || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+            if (layerIndex === 0) return null as unknown as number[];
+
             return new Array(this.layers[layerIndex]).fill(0);
         });
         // Errors cache
-        this.errors = Array.from({ length: this.layers.length }, (layer, layerIndex) => new Array(this.layers[layerIndex]).fill(0));
+        this.errors = Array.from({ length: this.layers.length }, (layer, layerIndex) => { 
+            if (layerIndex === 0) return null as unknown as number[];
+
+            return new Array(this.layers[layerIndex]).fill(0);
+        });
         // Deltas for momentum
         this.deltas = options.weights || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+            if (layerIndex === 0) return null as unknown as number[][];
+            
             return Array.from({ length: this.layers[layerIndex] }, () => {
                 return Array.from({ length: this.layers[layerIndex - 1] }, () => 0);
             })
         });
-
-        // Input weights, biases and pre-act values are non-existent, this is me being lazy
-        this.preActLayerValues[0] = null as unknown as number[];
-        this.weights[0] = null as unknown as number[][];
-        this.deltas[0] = null as unknown as number[][];
-        this.biases[0] = null as unknown as number[];
-        this.errors[0] = null as unknown as number[];
     }
 
 
