@@ -18,7 +18,7 @@ const neuralNetwork = new CatBrain({
 // Train
 console.log("Training...");
 const start = performance.now();
-neuralNetwork.train(300000, normalizeSet(trainingSet));
+neuralNetwork.train(1000, normalizeSet(trainingSet));
 console.log(`Training ended in ${performance.now() - start}ms`);
 
 // Calculate accuracy
@@ -28,12 +28,7 @@ console.log(`Accuracy: ${calculateAccuracy(testSet) * 100}%`);
 console.log(`Testing ended in ${performance.now() - startTest}ms`);
 
 // Export the model for use in the future
-delete neuralNetwork["layerValues"];
-delete neuralNetwork["errors"];
-delete neuralNetwork["preActLayerValues"];
-delete neuralNetwork["activationOptions"];
-delete neuralNetwork["deltas"];
-fs.writeFileSync("./newModel.json", JSON.stringify(neuralNetwork));
+fs.writeFileSync("./newModel.json", neuralNetwork.toJSON());
 console.log("Model exported to \"newModel.json\"");
 
 function normalize(dataObject) {
