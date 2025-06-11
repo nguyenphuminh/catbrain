@@ -1,7 +1,7 @@
 {
   "name": "catbrain",
-  "version": "0.1.21",
-  "description": "Neural networks made simple for Javascript",
+  "version": "0.1.22",
+  "description": "Neural networks made simple for cats, if cats are Javascript developers",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -21,7 +21,8 @@
     "framework",
     "node",
     "easy-to-use",
-    "catbrain"
+    "catbrain",
+    "brain"
   ],
   "author": "nguyenphuminh",
   "license": "GPL-3.0",

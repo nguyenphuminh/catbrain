@@ -15,6 +15,8 @@ class CatBrain {
     leakyReluAlpha;
     reluClip;
     momentum;
+    dampening;
+    nesterov;
     learningRate;
     decayRate;
     shuffle;
@@ -31,6 +33,8 @@ class CatBrain {
     constructor(options) {
         // Training configuration
         this.momentum = options.momentum || 0.1;
+        this.dampening = options.dampening || 0.1;
+        this.nesterov = options.nesterov ?? false;
         this.learningRate = options.learningRate || 0.01;
         this.decayRate = options.decayRate || 1;
         this.shuffle = options.shuffle ?? true;
@@ -94,7 +98,7 @@ class CatBrain {
                 return null;
             return new Array(this.layers[layerIndex]).fill(0);
         });
-        // Deltas for momentum
+        // Deltas (velocity) for momentum
         this.deltas = options.weights || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
             if (layerIndex === 0)
                 return null;
@@ -148,6 +152,8 @@ class CatBrain {
         // Avoid lookups
         const lastLayer = this.layerValues.length - 1;
         const momentum = options?.momentum || this.momentum;
+        const dampening = options?.dampening || this.dampening;
+        const nesterov = options?.nesterov || this.nesterov;
         const learningRate = options?.learningRate || this.learningRate;
         for (let layer = lastLayer; layer >= 1; layer--) {
             // Avoid lookups
@@ -187,10 +193,23 @@ class CatBrain {
                 const nodeWeights = layerWeights[nodeIndex];
                 const nodeDeltas = layerDeltas[nodeIndex];
                 const nodeError = layerErrors[nodeIndex];
-                for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
-                    const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
-                    nodeDeltas[prevNodeIndex] = momentum * nodeDeltas[prevNodeIndex] + (1 - momentum) * gradient;
-                    nodeWeights[prevNodeIndex] += learningRate * nodeDeltas[prevNodeIndex];
+                if (nesterov) {
+                    for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
+                        const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
+                        const effectiveGradient = (1 - dampening) * gradient;
+                        let delta = nodeDeltas[prevNodeIndex];
+                        nodeDeltas[prevNodeIndex] = momentum * delta + effectiveGradient;
+                        // Nesterov look-ahead
+                        delta = momentum * delta + effectiveGradient;
+                        nodeWeights[prevNodeIndex] += learningRate * delta;
+                    }
+                }
+                else {
+                    for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
+                        const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
+                        nodeDeltas[prevNodeIndex] = momentum * nodeDeltas[prevNodeIndex] + (1 - dampening) * gradient;
+                        nodeWeights[prevNodeIndex] += learningRate * nodeDeltas[prevNodeIndex];
+                    }
                 }
                 // Update bias for each node
                 layerBiases[nodeIndex] += learningRate * nodeError;
@@ -201,7 +220,9 @@ class CatBrain {
         const trainingOptions = {
             learningRate: options?.learningRate || this.learningRate,
             decayRate: options?.decayRate || this.decayRate,
-            momentum: options?.momentum || this.momentum
+            momentum: options?.momentum || this.momentum,
+            dampening: options?.dampening || this.dampening,
+            nesterov: options?.nesterov || this.nesterov
         };
         // Shuffle the dataset first
         if (this.shuffle)
@@ -222,6 +243,25 @@ class CatBrain {
             // Update the learning rate
             trainingOptions.learningRate *= trainingOptions.decayRate;
         }
+    }
+    toJSON() {
+        const { layers, weights, biases, weightInit, activation, outputActivation, leakyReluAlpha, reluClip, momentum, dampening, nesterov, learningRate, decayRate, shuffle } = this;
+        return JSON.stringify({
+            layers,
+            weights,
+            biases,
+            weightInit,
+            activation,
+            outputActivation,
+            leakyReluAlpha,
+            reluClip,
+            momentum,
+            dampening,
+            nesterov,
+            learningRate,
+            decayRate,
+            shuffle
+        });
     }
 }
 exports.CatBrain = CatBrain;

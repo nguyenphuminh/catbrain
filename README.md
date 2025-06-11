@@ -1,6 +1,6 @@
 # CatBrain
 
-Neural networks made simple for Javascript
+Neural networks made simple for Javascript, influenced by [Brain.js](https://github.com/BrainJS/brain.js).
 
 ## Setup
 
@@ -26,7 +26,11 @@ const neuralNetwork = new CatBrain({
     learningRate: 0.02, // Learning rate, default is 0.01
     decayRate: 0.9999, // Learning decay rate for each iteration, default is 1
     shuffle: true, // Choose whether to shuffle the dataset, default is true
-    momentum: 0.2, // Momentum optimizer, default is 0.1
+
+    // Momentum optimizer
+    momentum: 0.2, // Momentum constant, default is 0.1
+    dampening: 0.2, // Momentum dampening, default is 0.1
+    nesterov: true, // Enable Nesterov Accelerated Gradient, default is false
     
     // Activation config
     activation: "relu", // sigmoid/tanh/relu/leakyRelu/swish/mish/softplus/linear, default is relu
@@ -37,7 +41,8 @@ const neuralNetwork = new CatBrain({
     // Options: xavierUniform, xavierNormal, heUniform, heNormal, lecunUniform, lecunNormal, basicUniform
     weightInit: "heNormal"
 
-    // Options to load existing models, randomly initialized if not provided
+    // Options to load existing models, randomly initialized depends on activation if not provided
+    // Though, do note that biases are initialized as 0
     // weights: number[][][],
     // biases: number[][]
 });
@@ -68,6 +73,9 @@ neuralNetwork.train(
 
 // Run the neural net with our own input
 console.log(neuralNetwork.feedForward([1, 0]));
+
+// Export model to JSON
+// console.log(neuralNetwork.toJSON());
 ```
 
 ## Examples

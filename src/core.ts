@@ -10,6 +10,8 @@ export interface TrainingOptions {
     learningRate?: number;
     decayRate?: number;
     momentum?: number;
+    dampening?: number;
+    nesterov?: boolean;
     callback?: (trainingStatus: TrainingStatus) => void;
 }
 
@@ -30,6 +32,8 @@ export interface CatBrainOptions {
 
     // Training configurations
     momentum?: number;
+    dampening?: number;
+    nesterov?: boolean;
     learningRate?: number;
     decayRate?: number;
     shuffle?: boolean;
@@ -49,6 +53,8 @@ export class CatBrain {
     public reluClip: number;
 
     public momentum: number;
+    public dampening: number;
+    public nesterov: boolean;
     public learningRate: number;
     public decayRate: number;
     public shuffle: boolean;
@@ -69,6 +75,8 @@ export class CatBrain {
     constructor(options: CatBrainOptions) {
         // Training configuration
         this.momentum = options.momentum || 0.1;
+        this.dampening = options.dampening || 0.1;
+        this.nesterov = options.nesterov ?? false;
         this.learningRate = options.learningRate || 0.01;
         this.decayRate = options.decayRate || 1;
         this.shuffle = options.shuffle ?? true;
@@ -140,7 +148,7 @@ export class CatBrain {
 
             return new Array(this.layers[layerIndex]).fill(0);
         });
-        // Deltas for momentum
+        // Deltas (velocity) for momentum
         this.deltas = options.weights || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
             if (layerIndex === 0) return null as unknown as number[][];
             
@@ -206,6 +214,8 @@ export class CatBrain {
         // Avoid lookups
         const lastLayer = this.layerValues.length - 1;
         const momentum = options?.momentum || this.momentum;
+        const dampening = options?.dampening || this.dampening;
+        const nesterov = options?.nesterov || this.nesterov;
         const learningRate = options?.learningRate || this.learningRate;
 
         for (let layer = lastLayer; layer >= 1; layer--) {
@@ -251,12 +261,28 @@ export class CatBrain {
                 const nodeDeltas = layerDeltas[nodeIndex];
                 const nodeError = layerErrors[nodeIndex];
 
-                for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
-                    const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
+                if (nesterov) {
+                    for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
+                        const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
+                        const effectiveGradient = (1 - dampening) * gradient;
 
-                    nodeDeltas[prevNodeIndex] = momentum * nodeDeltas[prevNodeIndex] + (1 - momentum) * gradient;
+                        let delta = nodeDeltas[prevNodeIndex];
 
-                    nodeWeights[prevNodeIndex] += learningRate * nodeDeltas[prevNodeIndex];
+                        nodeDeltas[prevNodeIndex] = momentum * delta + effectiveGradient;
+
+                        // Nesterov look-ahead
+                        delta = momentum * delta + effectiveGradient;
+
+                        nodeWeights[prevNodeIndex] += learningRate * delta;
+                    }
+                } else {
+                    for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
+                        const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
+
+                        nodeDeltas[prevNodeIndex] = momentum * nodeDeltas[prevNodeIndex] + (1 - dampening) * gradient;
+
+                        nodeWeights[prevNodeIndex] += learningRate * nodeDeltas[prevNodeIndex];
+                    }
                 }
 
                 // Update bias for each node
@@ -273,7 +299,9 @@ export class CatBrain {
         const trainingOptions = {
             learningRate: options?.learningRate || this.learningRate,
             decayRate: options?.decayRate || this.decayRate,
-            momentum: options?.momentum || this.momentum
+            momentum: options?.momentum || this.momentum,
+            dampening: options?.dampening || this.dampening,
+            nesterov: options?.nesterov || this.nesterov
         }
 
         // Shuffle the dataset first
@@ -298,5 +326,47 @@ export class CatBrain {
             // Update the learning rate
             trainingOptions.learningRate *= trainingOptions.decayRate;
         }
+    }
+
+    toJSON() {
+        const {
+            layers,
+
+            weights,
+            biases,
+            weightInit,
+
+            activation,
+            outputActivation,
+            leakyReluAlpha,
+            reluClip,
+
+            momentum,
+            dampening,
+            nesterov,
+            learningRate,
+            decayRate,
+            shuffle
+        } = this;
+
+        return JSON.stringify({
+            layers,
+
+            weights,
+            biases,
+            weightInit,
+
+            activation,
+            outputActivation,
+            leakyReluAlpha,
+            reluClip,
+
+            momentum,
+            dampening,
+            nesterov,
+            learningRate,
+            decayRate,
+            shuffle
+        });
     }
 }

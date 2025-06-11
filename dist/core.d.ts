@@ -6,6 +6,8 @@ export interface TrainingOptions {
     learningRate?: number;
     decayRate?: number;
     momentum?: number;
+    dampening?: number;
+    nesterov?: boolean;
     callback?: (trainingStatus: TrainingStatus) => void;
 }
 export interface CatBrainOptions {
@@ -18,6 +20,8 @@ export interface CatBrainOptions {
     leakyReluAlpha?: number;
     reluClip?: number;
     momentum?: number;
+    dampening?: number;
+    nesterov?: boolean;
     learningRate?: number;
     decayRate?: number;
     shuffle?: boolean;
@@ -32,6 +36,8 @@ export declare class CatBrain {
     leakyReluAlpha: number;
     reluClip: number;
     momentum: number;
+    dampening: number;
+    nesterov: boolean;
     learningRate: number;
     decayRate: number;
     shuffle: boolean;
@@ -51,4 +57,5 @@ export declare class CatBrain {
         inputs: number[];
         outputs: number[];
     }[], options?: TrainingOptions): void;
+    toJSON(): string;
 }
