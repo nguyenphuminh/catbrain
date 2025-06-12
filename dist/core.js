@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CatBrain = void 0;
+const gpu_js_1 = require("gpu.js");
 const activation_1 = require("./activation");
 const rand_1 = require("./rand");
 const utils_1 = require("./utils");
@@ -20,6 +21,7 @@ class CatBrain {
     learningRate;
     decayRate;
     shuffle;
+    gpuOptions;
     // Mostly for internal use
     activationFunc;
     derivativeFunc;
@@ -28,8 +30,9 @@ class CatBrain {
     layerValues;
     preActLayerValues;
     errors;
-    activationOptions;
     deltas;
+    kernels;
+    gpu;
     constructor(options) {
         // Training configuration
         this.momentum = options.momentum || 0.1;
@@ -41,10 +44,6 @@ class CatBrain {
         // Activation function configuration
         this.leakyReluAlpha = options.leakyReluAlpha || 0.01;
         this.reluClip = options.reluClip || 5;
-        this.activationOptions = {
-            leakyReluAlpha: this.leakyReluAlpha,
-            reluClip: this.reluClip
-        };
         this.activation = options.activation || "relu";
         this.activationFunc = activation_1.Activation[this.activation] || activation_1.Activation.relu;
         const derivativeMethod = activation_1.Activation[this.activation + "Derivative"] || activation_1.Activation.reluDerivative;
@@ -52,7 +51,7 @@ class CatBrain {
             this.derivativeFunc = (preActValue, actValue) => derivativeMethod(actValue);
         }
         else {
-            this.derivativeFunc = (preActValue, actValue) => derivativeMethod(preActValue, this.activationOptions);
+            this.derivativeFunc = (preActValue, actValue) => derivativeMethod(preActValue, this.reluClip, this.leakyReluAlpha);
         }
         this.outputActivation = options.outputActivation || "sigmoid";
         this.outputActivationFunc = activation_1.Activation[this.outputActivation] || activation_1.Activation.sigmoid;
@@ -61,7 +60,7 @@ class CatBrain {
             this.outputDerivativeFunc = (preActValue, actValue) => outputDerivativeMethod(actValue);
         }
         else {
-            this.outputDerivativeFunc = (preActValue, actValue) => outputDerivativeMethod(preActValue, this.activationOptions);
+            this.outputDerivativeFunc = (preActValue, actValue) => outputDerivativeMethod(preActValue, this.reluClip, this.leakyReluAlpha);
         }
         // Model configuration
         this.layers = options.layers;
@@ -106,11 +105,21 @@ class CatBrain {
                 return Array.from({ length: this.layers[layerIndex - 1] }, () => 0);
             });
         });
+        // Init GPU
+        this.gpuOptions = options.gpuOptions || {};
+        this.gpu = new gpu_js_1.GPU({ ...this.gpuOptions });
+        // Init layers' kernels
+        this.kernels = Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+            if (layerIndex === 0)
+                return null;
+            return this.initKernels(this.layers[layerIndex], this.activationFunc, this.outputActivationFunc);
+        });
     }
     /*//////////////////////////////////////////////////////////////
                                 User APIs
     //////////////////////////////////////////////////////////////*/
-    feedForward(inputs) {
+    feedForward(inputs, options) {
+        const enableGPU = options?.enableGPU ?? false;
         // Feed new inputs to our first (input) layer
         this.layerValues[0] = inputs;
         // Propagate layers with layers behind them
@@ -124,36 +133,43 @@ class CatBrain {
             const prevLayer = this.layerValues[index - 1];
             const prevlayerSize = prevLayer.length;
             const isOutput = index === this.layers.length - 1;
-            const preActCurrentLayer = this.preActLayerValues[index];
-            for (let index = 0; index < currentLayerSize; index++) {
-                // Avoid lookups
-                const nodeWeights = weights[index];
-                // Add bias
-                preActCurrentLayer[index] = biases[index];
-                // Get weighed sum
-                for (let prevIndex = 0; prevIndex < prevlayerSize; prevIndex++) {
-                    const weight = nodeWeights[prevIndex];
-                    const prevNode = prevLayer[prevIndex];
-                    preActCurrentLayer[index] += weight * prevNode;
-                }
-                // Activate
-                if (isOutput) {
-                    currentLayer[index] = this.outputActivationFunc(preActCurrentLayer[index], this.activationOptions);
-                }
-                else {
-                    currentLayer[index] = this.activationFunc(preActCurrentLayer[index], this.activationOptions);
+            if (enableGPU) {
+                const { weightedSum, activateLayer } = this.kernels[index];
+                this.preActLayerValues[index] = Array.from(weightedSum(prevLayer, prevlayerSize, weights, biases));
+                this.layerValues[index] = Array.from(activateLayer(this.preActLayerValues[index], isOutput, this.reluClip, this.leakyReluAlpha));
+            }
+            else {
+                const preActCurrentLayer = this.preActLayerValues[index];
+                for (let index = 0; index < currentLayerSize; index++) {
+                    // Avoid lookups
+                    const nodeWeights = weights[index];
+                    // Add bias
+                    preActCurrentLayer[index] = biases[index];
+                    // Get weighed sum
+                    for (let prevIndex = 0; prevIndex < prevlayerSize; prevIndex++) {
+                        const weight = nodeWeights[prevIndex];
+                        const prevNode = prevLayer[prevIndex];
+                        preActCurrentLayer[index] += weight * prevNode;
+                    }
+                    // Activate
+                    if (isOutput) {
+                        currentLayer[index] = this.outputActivationFunc(preActCurrentLayer[index], this.reluClip, this.leakyReluAlpha);
+                    }
+                    else {
+                        currentLayer[index] = this.activationFunc(preActCurrentLayer[index], this.reluClip, this.leakyReluAlpha);
+                    }
                 }
             }
         }
         return this.layerValues[this.layerValues.length - 1];
     }
     backPropagate(inputs, target, options) {
-        const output = this.feedForward(inputs);
+        const output = this.feedForward(inputs, options);
         // Avoid lookups
         const lastLayer = this.layerValues.length - 1;
         const momentum = options?.momentum || this.momentum;
         const dampening = options?.dampening || this.dampening;
-        const nesterov = options?.nesterov || this.nesterov;
+        const nesterov = options?.nesterov ?? this.nesterov;
         const learningRate = options?.learningRate || this.learningRate;
         for (let layer = lastLayer; layer >= 1; layer--) {
             // Avoid lookups
@@ -222,10 +238,12 @@ class CatBrain {
             decayRate: options?.decayRate || this.decayRate,
             momentum: options?.momentum || this.momentum,
             dampening: options?.dampening || this.dampening,
-            nesterov: options?.nesterov || this.nesterov
+            nesterov: options?.nesterov ?? this.nesterov,
+            shuffle: options?.shuffle ?? this.shuffle,
+            enableGPU: options?.enableGPU ?? false
         };
         // Shuffle the dataset first
-        if (this.shuffle)
+        if (trainingOptions.shuffle)
             (0, utils_1.shuffle)(trainingData);
         let dataObjectIndex = 0;
         for (let iteration = 0; iteration < iterations; iteration++) {
@@ -235,7 +253,7 @@ class CatBrain {
             this.backPropagate(data.inputs, data.outputs, trainingOptions);
             // If we have gone through all of the dataset, reshuffle it and continue training
             if (dataObjectIndex === trainingData.length - 1) {
-                if (this.shuffle)
+                if (trainingOptions.shuffle)
                     (0, utils_1.shuffle)(trainingData);
             }
             // Move to the next data object, reset to the first if reached limit
@@ -244,8 +262,38 @@ class CatBrain {
             trainingOptions.learningRate *= trainingOptions.decayRate;
         }
     }
+    initKernels(layerSize, activationFunc, outputActivationFunc) {
+        const actFuncSource = (0, utils_1.methodToFunc)(activationFunc, "activationFunc");
+        const outputActFuncSource = (0, utils_1.methodToFunc)(outputActivationFunc, "outputActivationFunc");
+        return {
+            weightedSum: this.gpu.createKernel(function (prevLayer, prevSize, weights, biases) {
+                let sum = biases[this.thread.x];
+                for (let index = 0; index < prevSize; index++) {
+                    sum += prevLayer[index] * weights[this.thread.x][index];
+                }
+                return sum;
+            })
+                .setOutput([layerSize]),
+            activateLayer: this.gpu.createKernel(function (layer, isOutput, clip, alpha) {
+                if (isOutput)
+                    return outputActivationFunc(layer[this.thread.x], clip, alpha);
+                return activationFunc(layer[this.thread.x], clip, alpha);
+            })
+                .setFunctions([
+                {
+                    source: actFuncSource,
+                    settings: {}
+                },
+                {
+                    source: outputActFuncSource,
+                    settings: {}
+                }
+            ])
+                .setOutput([layerSize])
+        };
+    }
     toJSON() {
-        const { layers, weights, biases, weightInit, activation, outputActivation, leakyReluAlpha, reluClip, momentum, dampening, nesterov, learningRate, decayRate, shuffle } = this;
+        const { layers, weights, biases, weightInit, activation, outputActivation, leakyReluAlpha, reluClip, momentum, dampening, nesterov, learningRate, decayRate, shuffle, gpuOptions } = this;
         return JSON.stringify({
             layers,
             weights,
@@ -260,7 +308,8 @@ class CatBrain {
             nesterov,
             learningRate,
             decayRate,
-            shuffle
+            shuffle,
+            gpuOptions
         });
     }
 }

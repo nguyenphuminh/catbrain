@@ -3,89 +3,89 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Activation = void 0;
 class Activation {
     // Sigmoid function for activation
-    static sigmoid(x) {
+    static sigmoid(x, reluClip, leakyReluAlpha) {
         return 1 / (1 + Math.exp(-x));
     }
     // Sigmoid derivative
-    static sigmoidDerivative(x) {
+    static sigmoidDerivative(x, reluClip, leakyReluAlpha) {
         // Note that this function expects x to already be sigmoid(x), since this is mostly
         // used with the value of each neuron that has already gone through sigmoid
         return x * (1 - x);
     }
     // Tanh function for activation
-    static tanh(x) {
+    static tanh(x, reluClip, leakyReluAlpha) {
         return Math.tanh(x);
     }
     // Tanh derivative
-    static tanhDerivative(x) {
+    static tanhDerivative(x, reluClip, leakyReluAlpha) {
         // Note that this function expects x to already be tanh(x), since this is mostly
         // used with the value of each neuron that has already gone through tanh
         return 1 - x * x;
     }
     // Relu for activation
-    static relu(x, options) {
-        return Math.min(options.reluClip, Math.max(x, 0));
+    static relu(x, reluClip, leakyReluAlpha) {
+        return Math.min(reluClip, Math.max(x, 0));
     }
     // Relu derivative
-    static reluDerivative(x, options) {
-        return 0 < x && x <= options.reluClip ? 1 : 0;
+    static reluDerivative(x, reluClip, leakyReluAlpha) {
+        return 0 < x && x <= reluClip ? 1 : 0;
     }
     // Leaky Relu for activation
-    static leakyRelu(x, options) {
+    static leakyRelu(x, reluClip, leakyReluAlpha) {
         if (x > 0) {
-            return Math.min(options.reluClip, x);
+            return Math.min(reluClip, x);
         }
-        else if (x > -options.reluClip) {
-            return options.leakyReluAlpha * x;
+        else if (x > -reluClip) {
+            return leakyReluAlpha * x;
         }
-        return -options.reluClip * options.leakyReluAlpha;
+        return -reluClip * leakyReluAlpha;
     }
     // Leaky Rely derivative
-    static leakyReluDerivative(x, options) {
-        if (x > options.reluClip || x < -options.reluClip)
+    static leakyReluDerivative(x, reluClip, leakyReluAlpha) {
+        if (x > reluClip || x < -reluClip)
             return 0;
-        return x > 0 ? 1 : options.leakyReluAlpha;
+        return x > 0 ? 1 : leakyReluAlpha;
     }
     // Swish for activation
-    static swish(x, options) {
-        if (x > options.reluClip) {
-            return options.reluClip / (1 + Math.exp(-options.reluClip));
+    static swish(x, reluClip, leakyReluAlpha) {
+        if (x > reluClip) {
+            return reluClip / (1 + Math.exp(-reluClip));
         }
-        else if (x < -options.reluClip) {
-            return -options.reluClip / (1 + Math.exp(options.reluClip));
+        else if (x < -reluClip) {
+            return -reluClip / (1 + Math.exp(reluClip));
         }
         return x / (1 + Math.exp(-x));
     }
     // Swish derivative
-    static swishDerivative(x, options) {
-        if (x > options.reluClip || x < -options.reluClip)
+    static swishDerivative(x, reluClip, leakyReluAlpha) {
+        if (x > reluClip || x < -reluClip)
             return 0;
         const sigmoid = 1 / (1 + Math.exp(-x));
         return sigmoid + x * sigmoid * (1 - sigmoid);
     }
     // Softplus for activation
-    static softplus(x, options) {
-        if (x > options.reluClip)
-            return Math.log1p(Math.exp(options.reluClip));
+    static softplus(x, reluClip, leakyReluAlpha) {
+        if (x > reluClip)
+            return Math.log1p(Math.exp(reluClip));
         return Math.log1p(Math.exp(x));
     }
     // Softplus derivative
-    static softplusDerivative(x, options) {
-        return x < options.reluClip ? 1 / (1 + Math.exp(-x)) : 0;
+    static softplusDerivative(x, reluClip, leakyReluAlpha) {
+        return x < reluClip ? 1 / (1 + Math.exp(-x)) : 0;
     }
     // Mish
-    static mish(x, options) {
-        if (x > options.reluClip) {
-            return options.reluClip * Math.tanh(Math.log1p(Math.exp(options.reluClip)));
+    static mish(x, reluClip, leakyReluAlpha) {
+        if (x > reluClip) {
+            return reluClip * Math.tanh(Math.log1p(Math.exp(reluClip)));
         }
-        else if (x < -options.reluClip) {
-            return -options.reluClip * Math.tanh(Math.log1p(Math.exp(-options.reluClip)));
+        else if (x < -reluClip) {
+            return -reluClip * Math.tanh(Math.log1p(Math.exp(-reluClip)));
         }
         return x * Math.tanh(Math.log1p(Math.exp(x)));
     }
     // Mish derivative
-    static mishDerivative(x, options) {
-        if (x > options.reluClip || x < -options.reluClip)
+    static mishDerivative(x, reluClip, leakyReluAlpha) {
+        if (x > reluClip || x < -reluClip)
             return 0;
         const softplus = Math.log1p(Math.exp(x));
         const tanhSoftplus = Math.tanh(softplus);
@@ -94,11 +94,11 @@ class Activation {
         return tanhSoftplus + x * sech2Softplus * sigmoid;
     }
     // No activation
-    static linear(x) {
+    static linear(x, reluClip, leakyReluAlpha) {
         return x;
     }
     // No activation's derivative is just 1
-    static linearDerivative() {
+    static linearDerivative(x, reluClip, leakyReluAlpha) {
         return 1;
     }
 }

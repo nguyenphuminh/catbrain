@@ -1,6 +1,6 @@
 # CatBrain
 
-Neural networks made simple for Javascript, influenced by [Brain.js](https://github.com/BrainJS/brain.js).
+Neural networks made simple for Javascript with GPU acceleration, influenced by [Brain.js](https://github.com/BrainJS/brain.js).
 
 ## Setup
 
@@ -38,18 +38,23 @@ const neuralNetwork = new CatBrain({
     leakyReluAlpha: 0.01, // Alpha of leaky relu if you use it, default is 0.01
     reluClip: 5, // Relu clipping, applied in activation functions reaching infinity, default is 5
     // Weight init function, default depends on what activation is used (check ./src/rand.ts)
-    // Options: xavierUniform, xavierNormal, heUniform, heNormal, lecunUniform, lecunNormal, basicUniform
-    weightInit: "heNormal"
+    // Options: xavierUniform, xavierNormal, heUniform, heNormal, lecunUniform, lecunNormal
+    // There is also "basicUniform" which initializes with random numbers from 0 to 1
+    weightInit: "heNormal",
 
     // Options to load existing models, randomly initialized depends on activation if not provided
     // Though, do note that biases are initialized as 0
     // weights: number[][][],
     // biases: number[][]
+
+    // gpu.js options, this will be passed to the GPU constructor
+    // gpuOptions: {}
+    // Do note that this is heavily in-dev and not recommended for use at all currently
 });
 
 // Train
 neuralNetwork.train(
-    // Amount of iterations
+    // Number of iterations
     100000,
     // Dataset as an array
     [
@@ -64,10 +69,13 @@ neuralNetwork.train(
     //     learningRate: 0.02, // Will use original learning rate if not provided
     //     decayRate: 0.9999, // Will use original decay rate if not provided
     //     momentum: 0.1, // Will use original momentum if not provided
+    //     dampening: 0.1, // Will use original dampening if not provided
+    //     nesterov: 0.1, // Will use original nesterov if not provided
     //     // A function called before every iteration
     //     callback: (status) => {
     //         console.log(status.iteration)
-    //     }
+    //     },
+    //     enableGPU: true // Default is false if not specified
     // }
 );
 
@@ -91,7 +99,8 @@ Currently what I have in mind are:
 * Option to configure each layer independently.
 * Code refactoring and optimization.
 * More activation functions.
-* GPU acceleration.
+* More GD opimizers or different optimization algos.
+* Proper GPU acceleration.
 * More neural network architectures.
 * Minor utilities for convenience.
 

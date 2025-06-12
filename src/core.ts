@@ -1,6 +1,7 @@
-import { Activation, ActivationOptions } from "./activation";
+import { GPU, IGPUSettings, IKernelRunShortcut } from "gpu.js";
+import { Activation } from "./activation";
 import { Rand, weightInitWithAct } from "./rand";
-import { shuffle } from "./utils";
+import { methodToFunc, shuffle } from "./utils";
 
 export interface TrainingStatus {
     iteration: number;
@@ -12,7 +13,14 @@ export interface TrainingOptions {
     momentum?: number;
     dampening?: number;
     nesterov?: boolean;
+    shuffle?: boolean;
+    enableGPU?: boolean;
     callback?: (trainingStatus: TrainingStatus) => void;
+}
+
+export interface LayerKernels {
+    weightedSum: IKernelRunShortcut,
+    activateLayer: IKernelRunShortcut
 }
 
 export interface CatBrainOptions {
@@ -37,6 +45,9 @@ export interface CatBrainOptions {
     learningRate?: number;
     decayRate?: number;
     shuffle?: boolean;
+
+    // GPU configuration
+    gpuOptions: IGPUSettings;
 }
 
 export class CatBrain {
@@ -58,19 +69,21 @@ export class CatBrain {
     public learningRate: number;
     public decayRate: number;
     public shuffle: boolean;
+    public gpuOptions: IGPUSettings;
     
 
     // Mostly for internal use
-    public activationFunc: (x: number, options?: ActivationOptions) => number;
+    public activationFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
     public derivativeFunc: (preActValue: number, actValue: number) => number;
-    public outputActivationFunc: (x: number, options?: ActivationOptions) => number;
+    public outputActivationFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
     public outputDerivativeFunc: (preActValue: number, actValue: number) => number;
     
     public layerValues: number[][];
     public preActLayerValues: number[][];
     public errors: number[][];
-    public activationOptions: ActivationOptions;
     public deltas: number[][][];
+    public kernels: LayerKernels[];
+    public gpu: GPU;
 
     constructor(options: CatBrainOptions) {
         // Training configuration
@@ -85,10 +98,6 @@ export class CatBrain {
         // Activation function configuration
         this.leakyReluAlpha = options.leakyReluAlpha || 0.01;
         this.reluClip = options.reluClip || 5;
-        this.activationOptions = {
-            leakyReluAlpha: this.leakyReluAlpha,
-            reluClip: this.reluClip
-        }
 
         this.activation = options.activation || "relu";
         this.activationFunc = (Activation as Record<string, any>)[this.activation] || Activation.relu;
@@ -96,7 +105,7 @@ export class CatBrain {
         if (this.activation === "sigmoid" || this.activation === "tanh") {
             this.derivativeFunc = (preActValue: number, actValue: number) => derivativeMethod(actValue);
         } else {
-            this.derivativeFunc = (preActValue: number, actValue: number) => derivativeMethod(preActValue, this.activationOptions);
+            this.derivativeFunc = (preActValue: number, actValue: number) => derivativeMethod(preActValue, this.reluClip, this.leakyReluAlpha);
         }
 
         this.outputActivation = options.outputActivation || "sigmoid";
@@ -105,7 +114,7 @@ export class CatBrain {
         if (this.outputActivation === "sigmoid" || this.outputActivation === "tanh") {
             this.outputDerivativeFunc = (preActValue: number, actValue: number) => outputDerivativeMethod(actValue);
         } else {
-            this.outputDerivativeFunc = (preActValue: number, actValue: number) => outputDerivativeMethod(preActValue, this.activationOptions);
+            this.outputDerivativeFunc = (preActValue: number, actValue: number) => outputDerivativeMethod(preActValue, this.reluClip, this.leakyReluAlpha);
         }
 
 
@@ -156,6 +165,17 @@ export class CatBrain {
                 return Array.from({ length: this.layers[layerIndex - 1] }, () => 0);
             })
         });
+
+         // Init GPU
+        this.gpuOptions = options.gpuOptions || {};
+        this.gpu = new GPU({ ...this.gpuOptions });
+
+        // Init layers' kernels
+        this.kernels = Array.from({ length: this.layers.length }, (layer, layerIndex) => { 
+            if (layerIndex === 0) return null as unknown as LayerKernels;
+
+            return this.initKernels(this.layers[layerIndex], this.activationFunc, this.outputActivationFunc);
+        });
     }
 
 
@@ -163,7 +183,9 @@ export class CatBrain {
                                 User APIs
     //////////////////////////////////////////////////////////////*/
 
-    feedForward(inputs: number[]): number[] {
+    feedForward(inputs: number[], options?: TrainingOptions): number[] {
+        const enableGPU = options?.enableGPU ?? false;
+
         // Feed new inputs to our first (input) layer
         this.layerValues[0] = inputs;
 
@@ -179,28 +201,47 @@ export class CatBrain {
             const prevLayer = this.layerValues[index - 1];
             const prevlayerSize = prevLayer.length;
             const isOutput = index === this.layers.length-1;
-            const preActCurrentLayer = this.preActLayerValues[index];
 
-            for (let index = 0; index < currentLayerSize; index++) {
-                // Avoid lookups
-                const nodeWeights = weights[index];
+            if (enableGPU) {
+                const { weightedSum, activateLayer } = this.kernels[index];
 
-                // Add bias
-                preActCurrentLayer[index] = biases[index];
-    
-                // Get weighed sum
-                for (let prevIndex = 0; prevIndex < prevlayerSize; prevIndex++) {
-                    const weight = nodeWeights[prevIndex];
-                    const prevNode = prevLayer[prevIndex];
-    
-                    preActCurrentLayer[index] += weight * prevNode;
-                }
+                this.preActLayerValues[index] = Array.from(weightedSum(
+                    prevLayer,
+                    prevlayerSize,
+                    weights,
+                    biases,
+                ) as Float32Array)
 
-                // Activate
-                if (isOutput) {
-                    currentLayer[index] = this.outputActivationFunc(preActCurrentLayer[index], this.activationOptions);
-                } else {
-                    currentLayer[index] = this.activationFunc(preActCurrentLayer[index], this.activationOptions);
+                this.layerValues[index] = Array.from(activateLayer(
+                    this.preActLayerValues[index],
+                    isOutput,
+                    this.reluClip,
+                    this.leakyReluAlpha
+                ) as Float32Array);
+            } else {
+                const preActCurrentLayer = this.preActLayerValues[index];
+            
+                for (let index = 0; index < currentLayerSize; index++) {
+                    // Avoid lookups
+                    const nodeWeights = weights[index];
+
+                    // Add bias
+                    preActCurrentLayer[index] = biases[index];
+        
+                    // Get weighed sum
+                    for (let prevIndex = 0; prevIndex < prevlayerSize; prevIndex++) {
+                        const weight = nodeWeights[prevIndex];
+                        const prevNode = prevLayer[prevIndex];
+        
+                        preActCurrentLayer[index] += weight * prevNode;
+                    }
+
+                    // Activate
+                    if (isOutput) {
+                        currentLayer[index] = this.outputActivationFunc(preActCurrentLayer[index], this.reluClip, this.leakyReluAlpha);
+                    } else {
+                        currentLayer[index] = this.activationFunc(preActCurrentLayer[index], this.reluClip, this.leakyReluAlpha);
+                    }
                 }
             }
         }
@@ -209,13 +250,13 @@ export class CatBrain {
     }
 
     backPropagate(inputs: number[], target: number[], options: TrainingOptions) {
-        const output = this.feedForward(inputs);
+        const output = this.feedForward(inputs, options);
 
         // Avoid lookups
         const lastLayer = this.layerValues.length - 1;
         const momentum = options?.momentum || this.momentum;
         const dampening = options?.dampening || this.dampening;
-        const nesterov = options?.nesterov || this.nesterov;
+        const nesterov = options?.nesterov ?? this.nesterov;
         const learningRate = options?.learningRate || this.learningRate;
 
         for (let layer = lastLayer; layer >= 1; layer--) {
@@ -301,11 +342,13 @@ export class CatBrain {
             decayRate: options?.decayRate || this.decayRate,
             momentum: options?.momentum || this.momentum,
             dampening: options?.dampening || this.dampening,
-            nesterov: options?.nesterov || this.nesterov
+            nesterov: options?.nesterov ?? this.nesterov,
+            shuffle: options?.shuffle ?? this.shuffle,
+            enableGPU: options?.enableGPU ?? false
         }
 
         // Shuffle the dataset first
-        if (this.shuffle) shuffle(trainingData);
+        if (trainingOptions.shuffle) shuffle(trainingData);
 
         let dataObjectIndex = 0;
 
@@ -317,7 +360,7 @@ export class CatBrain {
 
             // If we have gone through all of the dataset, reshuffle it and continue training
             if (dataObjectIndex === trainingData.length - 1) {
-                if (this.shuffle) shuffle(trainingData);
+                if (trainingOptions.shuffle) shuffle(trainingData);
             }
 
             // Move to the next data object, reset to the first if reached limit
@@ -325,6 +368,50 @@ export class CatBrain {
 
             // Update the learning rate
             trainingOptions.learningRate *= trainingOptions.decayRate;
+        }
+    }
+
+    initKernels(layerSize: number, activationFunc: Function, outputActivationFunc: Function) {
+        const actFuncSource = methodToFunc(activationFunc, "activationFunc");
+        const outputActFuncSource = methodToFunc(outputActivationFunc, "outputActivationFunc");
+
+        return {
+            weightedSum: this.gpu.createKernel(function(
+                prevLayer: number[],
+                prevSize: number,
+                weights: number[][],
+                biases: number[]
+            ) {
+                let sum = biases[this.thread.x];
+
+                for (let index = 0; index < prevSize; index++) {
+                    sum += prevLayer[index] * weights[this.thread.x][index];
+                }
+
+                return sum;
+            })
+            .setOutput([ layerSize ]),
+
+            activateLayer: this.gpu.createKernel(function(
+                layer: number[],
+                isOutput: boolean,
+                clip: number,
+                alpha: number
+            ) {
+                if (isOutput) return outputActivationFunc(layer[this.thread.x], clip, alpha);
+
+                return activationFunc(layer[this.thread.x], clip, alpha);
+            })
+            .setFunctions([
+                {
+                    source: actFuncSource,
+                    settings: {}
+                },
+                {
+                    source: outputActFuncSource,
+                    settings: {}
+                }])
+            .setOutput([ layerSize ])
         }
     }
 
@@ -346,7 +433,9 @@ export class CatBrain {
             nesterov,
             learningRate,
             decayRate,
-            shuffle
+            shuffle,
+
+            gpuOptions
         } = this;
 
         return JSON.stringify({
@@ -366,7 +455,9 @@ export class CatBrain {
             nesterov,
             learningRate,
             decayRate,
-            shuffle
+            shuffle,
+
+            gpuOptions
         });
     }
 }

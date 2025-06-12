@@ -1,6 +1,6 @@
 {
   "name": "catbrain",
-  "version": "0.1.22",
+  "version": "0.1.24",
   "description": "Neural networks made simple for cats, if cats are Javascript developers",
   "main": "index.js",
   "scripts": {
@@ -22,7 +22,9 @@
     "node",
     "easy-to-use",
     "catbrain",
-    "brain"
+    "brain",
+    "gpu",
+    "gpu-acceleration"
   ],
   "author": "nguyenphuminh",
   "license": "GPL-3.0",
@@ -40,5 +42,8 @@
     "index.js",
     "LICENSE",
     "README.md"
-  ]
+  ],
+  "dependencies": {
+    "gpu.js": "^2.16.0"
+  }
 }
