@@ -164,132 +164,107 @@ export class CatBrain {
     //////////////////////////////////////////////////////////////*/
 
     feedForward(inputs: number[]): number[] {
-        // Avoid lookups
-        const { 
-            layerValues,
-            outputActivationFunc,
-            activationFunc,
-            preActLayerValues,
-            activationOptions,
-            weights,
-            biases
-        } = this;
-        const layers = layerValues.length;
-        const lastLayer = layers - 1;
-
         // Feed new inputs to our first (input) layer
-        layerValues[0] = inputs;
+        this.layerValues[0] = inputs;
 
         // Propagate layers with layers behind them
-        for (let layerIndex = 1; layerIndex < layers; layerIndex++) {
-            // Avoid lookups
-            const currentLayer = layerValues[layerIndex];
-            const currentLayerSize = currentLayer.length;
-            const currentWeights = weights[layerIndex];
-            const currentBiases = biases[layerIndex];
-            const prevLayer = layerValues[layerIndex - 1];
-            const prevlayerSize = prevLayer.length;
-            const preActCurrentLayer = preActLayerValues[layerIndex];
-            const currentActivation = layerIndex === lastLayer ? outputActivationFunc : activationFunc;
+        const layers = this.layerValues.length;
 
-            for (let nodeIndex = 0; nodeIndex < currentLayerSize; nodeIndex++) {
+        for (let index = 1; index < layers; index++) {
+            // Avoid lookups
+            const currentLayer = this.layerValues[index];
+            const currentLayerSize = currentLayer.length;
+            const weights = this.weights[index];
+            const biases = this.biases[index];
+            const prevLayer = this.layerValues[index - 1];
+            const prevlayerSize = prevLayer.length;
+            const isOutput = index === this.layers.length-1;
+            const preActCurrentLayer = this.preActLayerValues[index];
+
+            for (let index = 0; index < currentLayerSize; index++) {
                 // Avoid lookups
-                const nodeWeights = currentWeights[nodeIndex];
+                const nodeWeights = weights[index];
 
                 // Add bias
-                preActCurrentLayer[nodeIndex] = currentBiases[nodeIndex];
+                preActCurrentLayer[index] = biases[index];
     
                 // Get weighed sum
                 for (let prevIndex = 0; prevIndex < prevlayerSize; prevIndex++) {
                     const weight = nodeWeights[prevIndex];
                     const prevNode = prevLayer[prevIndex];
     
-                    preActCurrentLayer[nodeIndex] += weight * prevNode;
+                    preActCurrentLayer[index] += weight * prevNode;
                 }
 
                 // Activate
-                currentLayer[nodeIndex] = currentActivation(preActCurrentLayer[nodeIndex], activationOptions);
+                if (isOutput) {
+                    currentLayer[index] = this.outputActivationFunc(preActCurrentLayer[index], this.activationOptions);
+                } else {
+                    currentLayer[index] = this.activationFunc(preActCurrentLayer[index], this.activationOptions);
+                }
             }
         }
 
-        return layerValues[lastLayer];
+        return this.layerValues[this.layerValues.length-1];
     }
 
     backPropagate(inputs: number[], target: number[], options: TrainingOptions) {
         const output = this.feedForward(inputs);
 
-        // Init
+        // Avoid lookups
+        const lastLayer = this.layerValues.length - 1;
         const momentum = options?.momentum || this.momentum;
         const dampening = options?.dampening || this.dampening;
         const nesterov = options?.nesterov || this.nesterov;
         const learningRate = options?.learningRate || this.learningRate;
 
-        // Avoid lookups
-        const {
-            layers,
-            weights,
-            errors,
-            preActLayerValues,
-            layerValues,
-            biases,
-            deltas,
-            outputDerivativeFunc,
-            derivativeFunc
-        } = this;
-        const dampFactor = 1 - dampening;
-        const lastLayer = layerValues.length - 1;
-
         for (let layer = lastLayer; layer >= 1; layer--) {
             // Avoid lookups
-            const nextLayer = layer + 1;
-            const prevLayer = layer - 1;
-            const nextLayerSize = layers[nextLayer];
-            const nextLayerWeights = weights[nextLayer];
-            const nextLayerErrors = errors[nextLayer];
-            const currentPreActLayerValues = preActLayerValues[layer];
-            const currentLayerValues = layerValues[layer];
-            const currentLayerSize = layers[layer];
-            const currentLayerWeights = weights[layer];
-            const currentLayerBiases = biases[layer];
-            const currentLayerDeltas = deltas[layer];
-            const currentLayerErrors = errors[layer];
-            const prevLayerValues = layerValues[prevLayer];
-            const prevLayerSize = layers[prevLayer];
+            const nextLayerSize = this.layers[layer + 1];
+            const nextLayerWeights = this.weights[layer + 1];
+            const nextLayerErrors = this.errors[layer + 1];
+            const preActLayerValues = this.preActLayerValues[layer];
+            const layerValues = this.layerValues[layer];
+            const layerSize = this.layers[layer];
+            const layerWeights = this.weights[layer];
+            const layerBiases = this.biases[layer];
+            const layerDeltas = this.deltas[layer];
+            const layerErrors = this.errors[layer];
+            const prevLayerValues = this.layerValues[layer - 1];
+            const prevLayerSize = this.layers[layer - 1];
             const isLastLayer = layer === lastLayer;
-            const currentDerivative = isLastLayer ? outputDerivativeFunc : derivativeFunc;
 
-            for (let nodeIndex = 0; nodeIndex < currentLayerSize; nodeIndex++) {
+            for (let nodeIndex = 0; nodeIndex < layerSize; nodeIndex++) {
                 // Calculate derivative ahead of time
-                const preActNeuron = currentPreActLayerValues[nodeIndex];
-                const actNeuron = currentLayerValues[nodeIndex];
-                const derivative = currentDerivative(preActNeuron, actNeuron);
+                const preActNeuron = preActLayerValues[nodeIndex];
+                const actNeuron = layerValues[nodeIndex];
+                const derivative = isLastLayer ? 
+                                   this.outputDerivativeFunc(preActNeuron, actNeuron) :
+                                   this.derivativeFunc(preActNeuron, actNeuron);
 
                 // Calculate error
-                currentLayerErrors[nodeIndex] = 0;
+                layerErrors[nodeIndex] = 0;
 
                 // Output layer error
-                if (isLastLayer) {
-                    currentLayerErrors[nodeIndex] = target[nodeIndex] - output[nodeIndex];
+                if (layer === lastLayer) {
+                    layerErrors[nodeIndex] = target[nodeIndex] - output[nodeIndex];
                 }
                 // Hidden layer error
                 else {
                     for (let nextNodeIndex = 0; nextNodeIndex < nextLayerSize; nextNodeIndex++) {
-                        currentLayerErrors[nodeIndex] += nextLayerWeights[nextNodeIndex][nodeIndex] * nextLayerErrors[nextNodeIndex];
+                        layerErrors[nodeIndex] += nextLayerWeights[nextNodeIndex][nodeIndex] * nextLayerErrors[nextNodeIndex];
                     }
                 }
 
                 // Update weights for each node
-                const nodeWeights = currentLayerWeights[nodeIndex];
-                const nodeDeltas = currentLayerDeltas[nodeIndex];
-                const nodeError = currentLayerErrors[nodeIndex];
-
-                // Avoid lookups
-                const gradBase = nodeError * derivative;
+                const nodeWeights = layerWeights[nodeIndex];
+                const nodeDeltas = layerDeltas[nodeIndex];
+                const nodeError = layerErrors[nodeIndex];
 
                 if (nesterov) {
                     for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
-                        const gradient = gradBase * prevLayerValues[prevNodeIndex];
-                        const effectiveGradient = dampFactor * gradient;
+                        const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
+                        const effectiveGradient = (1 - dampening) * gradient;
 
                         let delta = nodeDeltas[prevNodeIndex];
 
@@ -302,16 +277,16 @@ export class CatBrain {
                     }
                 } else {
                     for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
-                        const gradient = gradBase * prevLayerValues[prevNodeIndex];
+                        const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
 
-                        nodeDeltas[prevNodeIndex] = momentum * nodeDeltas[prevNodeIndex] + dampFactor * gradient;
+                        nodeDeltas[prevNodeIndex] = momentum * nodeDeltas[prevNodeIndex] + (1 - dampening) * gradient;
 
                         nodeWeights[prevNodeIndex] += learningRate * nodeDeltas[prevNodeIndex];
                     }
                 }
 
                 // Update bias for each node
-                currentLayerBiases[nodeIndex] += learningRate * nodeError;
+                layerBiases[nodeIndex] += learningRate * nodeError;
             }
         }
     }

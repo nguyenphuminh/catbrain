@@ -1,6 +1,6 @@
 {
   "name": "catbrain",
-  "version": "0.1.23",
+  "version": "0.1.22",
   "description": "Neural networks made simple for cats, if cats are Javascript developers",
   "main": "index.js",
   "scripts": {
