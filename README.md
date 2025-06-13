@@ -50,6 +50,7 @@ const neuralNetwork = new CatBrain({
     // gpu.js options, this will be passed to the GPU constructor
     // gpuOptions: {}
     // Do note that this is heavily in-dev and not recommended for use at all currently
+    // In addition, Nesterov Accelerated Gradient is currently not supported for GPU
 });
 
 // Train
@@ -99,13 +100,13 @@ There are several demos available in `./examples`:
 
 Currently what I have in mind are:
 
-* Option to configure each layer independently.
-* Code refactoring and optimization.
-* More activation functions.
+* Option to configure each layer independently to do more than just MLPs.
+* Proper GPU acceleration, possibly with CUDA/ROCm and Node C++ bindings.
 * More GD opimizers or different optimization algos.
-* Proper GPU acceleration.
-* More neural network architectures.
+* More pre-built neural network architectures.
+* Code refactoring and optimization.
 * Minor utilities for convenience.
+* More activation functions.
 
 ## Copyrights and License
 

@@ -6,9 +6,9 @@ export class Activation {
 
     // Sigmoid derivative
     static sigmoidDerivative(x: number, reluClip?: number, leakyReluAlpha?: number) {
-        // Note that this function expects x to already be sigmoid(x), since this is mostly
-        // used with the value of each neuron that has already gone through sigmoid
-        return x * (1 - x);
+        const sigmoid = 1 / (1 + Math.exp(-x));
+
+        return sigmoid * (1 - sigmoid);
     }
 
     // Tanh function for activation
@@ -18,9 +18,9 @@ export class Activation {
 
     // Tanh derivative
     static tanhDerivative(x: number, reluClip?: number, leakyReluAlpha?: number) {
-        // Note that this function expects x to already be tanh(x), since this is mostly
-        // used with the value of each neuron that has already gone through tanh
-        return 1 - x * x;
+        const tanh = Math.tanh(x);
+
+        return 1 - tanh * tanh;
     }
 
     // Relu for activation

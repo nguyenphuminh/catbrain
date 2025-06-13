@@ -17,6 +17,9 @@ export interface LayerKernels {
     activateLayer: IKernelRunShortcut;
     calculateErrors: IKernelRunShortcut;
     calculateOutputErrors: IKernelRunShortcut;
+    calculateDeltas: IKernelRunShortcut;
+    updateWeights: IKernelRunShortcut;
+    addBiases: IKernelRunShortcut;
 }
 export interface CatBrainOptions {
     layers: number[];
@@ -52,9 +55,9 @@ export declare class CatBrain {
     shuffle: boolean;
     gpuOptions: IGPUSettings;
     activationFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
-    derivativeFunc: (preActValue: number, actValue: number) => number;
+    derivativeFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
     outputActivationFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
-    outputDerivativeFunc: (preActValue: number, actValue: number) => number;
+    outputDerivativeFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
     layerValues: number[][];
     preActLayerValues: number[][];
     errors: number[][];
@@ -68,11 +71,14 @@ export declare class CatBrain {
         inputs: number[];
         outputs: number[];
     }[], options?: TrainingOptions): void;
-    initKernels(layerSize: number, activationFunc: Function, outputActivationFunc: Function): {
+    initKernels(layerSize: number, prevLayerSize: number, activationFunc: Function, outputActivationFunc: Function, derivativeFunc: Function, outputDerivativeFunc: Function): {
         weightedSum: IKernelRunShortcut;
         activateLayer: IKernelRunShortcut;
         calculateErrors: IKernelRunShortcut;
         calculateOutputErrors: IKernelRunShortcut;
+        calculateDeltas: IKernelRunShortcut;
+        updateWeights: IKernelRunShortcut;
+        addBiases: IKernelRunShortcut;
     };
     toJSON(): string;
 }

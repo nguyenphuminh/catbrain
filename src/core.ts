@@ -23,6 +23,9 @@ export interface LayerKernels {
     activateLayer: IKernelRunShortcut;
     calculateErrors: IKernelRunShortcut;
     calculateOutputErrors: IKernelRunShortcut;
+    calculateDeltas: IKernelRunShortcut;
+    updateWeights: IKernelRunShortcut;
+    addBiases: IKernelRunShortcut;
 }
 
 export interface CatBrainOptions {
@@ -76,10 +79,10 @@ export class CatBrain {
 
     // Mostly for internal use
     public activationFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
-    public derivativeFunc: (preActValue: number, actValue: number) => number;
+    public derivativeFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
     public outputActivationFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
-    public outputDerivativeFunc: (preActValue: number, actValue: number) => number;
-    
+    public outputDerivativeFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
+
     public layerValues: number[][];
     public preActLayerValues: number[][];
     public errors: number[][];
@@ -103,22 +106,11 @@ export class CatBrain {
 
         this.activation = options.activation || "relu";
         this.activationFunc = (Activation as Record<string, any>)[this.activation] || Activation.relu;
-        const derivativeMethod = (Activation as Record<string, any>)[this.activation + "Derivative"] || Activation.reluDerivative;
-        if (this.activation === "sigmoid" || this.activation === "tanh") {
-            this.derivativeFunc = (preActValue: number, actValue: number) => derivativeMethod(actValue);
-        } else {
-            this.derivativeFunc = (preActValue: number, actValue: number) => derivativeMethod(preActValue, this.reluClip, this.leakyReluAlpha);
-        }
+        this.derivativeFunc = (Activation as Record<string, any>)[this.activation + "Derivative"] || Activation.reluDerivative;
 
         this.outputActivation = options.outputActivation || "sigmoid";
         this.outputActivationFunc = (Activation as Record<string, any>)[this.outputActivation] || Activation.sigmoid;
-        const outputDerivativeMethod = (Activation as Record<string, any>)[this.outputActivation + "Derivative"] || Activation.sigmoidDerivative;
-        if (this.outputActivation === "sigmoid" || this.outputActivation === "tanh") {
-            this.outputDerivativeFunc = (preActValue: number, actValue: number) => outputDerivativeMethod(actValue);
-        } else {
-            this.outputDerivativeFunc = (preActValue: number, actValue: number) => outputDerivativeMethod(preActValue, this.reluClip, this.leakyReluAlpha);
-        }
-
+        this.outputDerivativeFunc = (Activation as Record<string, any>)[this.outputActivation + "Derivative"] || Activation.sigmoidDerivative;
 
         // Model configuration
         this.layers = options.layers;
@@ -176,7 +168,14 @@ export class CatBrain {
         this.kernels = Array.from({ length: this.layers.length }, (layer, layerIndex) => { 
             if (layerIndex === 0) return null as unknown as LayerKernels;
 
-            return this.initKernels(this.layers[layerIndex], this.activationFunc, this.outputActivationFunc);
+            return this.initKernels(
+                this.layers[layerIndex],
+                this.layers[layerIndex-1],
+                this.activationFunc,
+                this.outputActivationFunc,
+                this.derivativeFunc,
+                this.outputDerivativeFunc
+            );
         });
     }
 
@@ -223,26 +222,26 @@ export class CatBrain {
             } else {
                 const preActCurrentLayer = this.preActLayerValues[index];
             
-                for (let index = 0; index < currentLayerSize; index++) {
+                for (let nodeIndex = 0; nodeIndex < currentLayerSize; nodeIndex++) {
                     // Avoid lookups
-                    const nodeWeights = weights[index];
+                    const nodeWeights = weights[nodeIndex];
 
                     // Add bias
-                    preActCurrentLayer[index] = biases[index];
+                    preActCurrentLayer[nodeIndex] = biases[nodeIndex];
         
                     // Get weighed sum
                     for (let prevIndex = 0; prevIndex < prevlayerSize; prevIndex++) {
                         const weight = nodeWeights[prevIndex];
                         const prevNode = prevLayer[prevIndex];
         
-                        preActCurrentLayer[index] += weight * prevNode;
+                        preActCurrentLayer[nodeIndex] += weight * prevNode;
                     }
 
                     // Activate
                     if (isOutput) {
-                        currentLayer[index] = this.outputActivationFunc(preActCurrentLayer[index], this.reluClip, this.leakyReluAlpha);
+                        currentLayer[nodeIndex] = this.outputActivationFunc(preActCurrentLayer[nodeIndex], this.reluClip, this.leakyReluAlpha);
                     } else {
-                        currentLayer[index] = this.activationFunc(preActCurrentLayer[index], this.reluClip, this.leakyReluAlpha);
+                        currentLayer[nodeIndex] = this.activationFunc(preActCurrentLayer[nodeIndex], this.reluClip, this.leakyReluAlpha);
                     }
                 }
             }
@@ -267,21 +266,25 @@ export class CatBrain {
             const nextLayerWeights = this.weights[layer + 1];
             const nextLayerErrors = this.errors[layer + 1];
             const preActLayerValues = this.preActLayerValues[layer];
-            const layerValues = this.layerValues[layer];
             const layerSize = this.layers[layer];
             const layerWeights = this.weights[layer];
             const layerBiases = this.biases[layer];
             const layerDeltas = this.deltas[layer];
+            const layerErrors = this.errors[layer];
             const prevLayerValues = this.layerValues[layer - 1];
             const prevLayerSize = this.layers[layer - 1];
             const isLastLayer = layer === lastLayer;
 
-            // Calculate errors
-            let layerErrors = this.errors[layer];
-
             if (enableGPU) {
-                const { calculateErrors, calculateOutputErrors } = this.kernels[layer];
+                const {
+                    calculateErrors,
+                    calculateOutputErrors,
+                    calculateDeltas,
+                    updateWeights,
+                    addBiases
+                } = this.kernels[layer];
 
+                // Calculate errors
                 if (isLastLayer) {
                     this.errors[layer] = Array.from(calculateOutputErrors(
                         target,
@@ -293,10 +296,36 @@ export class CatBrain {
                         nextLayerWeights,
                         nextLayerErrors
                     ) as Float32Array);
-                }   
+                }
 
-                layerErrors = this.errors[layer];
+                // Calculate deltas
+                this.deltas[layer] = (calculateDeltas(
+                    layerDeltas,
+                    this.errors[layer],
+                    preActLayerValues,
+                    prevLayerValues,
+                    isLastLayer,
+                    dampening,
+                    momentum,
+                    this.reluClip,
+                    this.leakyReluAlpha
+                ) as Float32Array[]).map(nodeDeltas => Array.from(nodeDeltas));
+
+                // Update weights
+                this.weights[layer] = (updateWeights(
+                    layerWeights,
+                    learningRate,
+                    this.deltas[layer]
+                ) as Float32Array[]).map(nodeWeights => Array.from(nodeWeights));
+
+                // Add biases
+                this.biases[layer] = Array.from(addBiases(
+                    layerBiases,
+                    learningRate,
+                    this.errors[layer]
+                ) as Float32Array);
             } else {
+                // Calculate errors
                 for (let nodeIndex = 0; nodeIndex < layerSize; nodeIndex++) {
                     // Calculate error
                     layerErrors[nodeIndex] = 0;
@@ -311,48 +340,43 @@ export class CatBrain {
                             layerErrors[nodeIndex] += nextLayerWeights[nextNodeIndex][nodeIndex] * nextLayerErrors[nextNodeIndex];
                         }
                     }
-                }
-            }
 
-            // Update weights for each node
-            for (let nodeIndex = 0; nodeIndex < layerSize; nodeIndex++) {
-                const nodeWeights = layerWeights[nodeIndex];
-                const nodeDeltas = layerDeltas[nodeIndex];
-                const nodeError = layerErrors[nodeIndex];
+                    const nodeWeights = layerWeights[nodeIndex];
+                    const nodeDeltas = layerDeltas[nodeIndex];
+                    const nodeError = layerErrors[nodeIndex];
 
-                // Calculate derivative ahead of time
-                const preActNeuron = preActLayerValues[nodeIndex];
-                const actNeuron = layerValues[nodeIndex];
-                const derivative = isLastLayer ? 
-                                this.outputDerivativeFunc(preActNeuron, actNeuron) :
-                                this.derivativeFunc(preActNeuron, actNeuron);
+                    // Calculate derivative ahead of time
+                    const derivative = isLastLayer ? 
+                                    this.outputDerivativeFunc(preActLayerValues[nodeIndex], this.reluClip, this.leakyReluAlpha) :
+                                    this.derivativeFunc(preActLayerValues[nodeIndex], this.reluClip, this.leakyReluAlpha);
 
-                if (nesterov) {
-                    for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
-                        const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
-                        const effectiveGradient = (1 - dampening) * gradient;
+                    if (nesterov) {
+                        for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
+                            const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
+                            const effectiveGradient = (1 - dampening) * gradient;
 
-                        let delta = nodeDeltas[prevNodeIndex];
+                            let delta = nodeDeltas[prevNodeIndex];
 
-                        nodeDeltas[prevNodeIndex] = momentum * delta + effectiveGradient;
+                            nodeDeltas[prevNodeIndex] = momentum * delta + effectiveGradient;
 
-                        // Nesterov look-ahead
-                        delta = momentum * delta + effectiveGradient;
+                            // Nesterov look-ahead
+                            delta = momentum * delta + effectiveGradient;
 
-                        nodeWeights[prevNodeIndex] += learningRate * delta;
+                            nodeWeights[prevNodeIndex] += learningRate * delta;
+                        }
+                    } else {
+                        for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
+                            const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
+
+                            nodeDeltas[prevNodeIndex] = momentum * nodeDeltas[prevNodeIndex] + (1 - dampening) * gradient;
+
+                            nodeWeights[prevNodeIndex] += learningRate * nodeDeltas[prevNodeIndex];
+                        }
                     }
-                } else {
-                    for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
-                        const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
 
-                        nodeDeltas[prevNodeIndex] = momentum * nodeDeltas[prevNodeIndex] + (1 - dampening) * gradient;
-
-                        nodeWeights[prevNodeIndex] += learningRate * nodeDeltas[prevNodeIndex];
-                    }
+                    // Update bias for each node
+                    layerBiases[nodeIndex] += learningRate * nodeError;
                 }
-
-                // Update bias for each node
-                layerBiases[nodeIndex] += learningRate * nodeError;
             }
         }
     }
@@ -396,9 +420,18 @@ export class CatBrain {
         }
     }
 
-    initKernels(layerSize: number, activationFunc: Function, outputActivationFunc: Function) {
+    initKernels(
+        layerSize: number,
+        prevLayerSize: number,
+        activationFunc: Function,
+        outputActivationFunc: Function,
+        derivativeFunc: Function,
+        outputDerivativeFunc: Function
+    ) {
         const actFuncSource = methodToFunc(activationFunc, "activationFunc");
         const outputActFuncSource = methodToFunc(outputActivationFunc, "outputActivationFunc");
+        const derFuncSource = methodToFunc(derivativeFunc, "derivativeFunc");
+        const outputDerFuncSource = methodToFunc(outputDerivativeFunc, "outputDerivativeFunc");
 
         return {
             weightedSum: this.gpu.createKernel(function(
@@ -435,7 +468,7 @@ export class CatBrain {
                 {
                     source: outputActFuncSource,
                     settings: {}
-                }])
+            }])
             .setOutput([ layerSize ]),
 
             calculateErrors: this.gpu.createKernel(function(
@@ -458,6 +491,55 @@ export class CatBrain {
                 output: number[],
             ) {
                 return target[this.thread.x] - output[this.thread.x];
+            })
+            .setOutput([ layerSize ]),
+
+            calculateDeltas: this.gpu.createKernel(function(
+                layerDeltas: number[][],
+                layerErrors: number[],
+                preActLayerValues: number[],
+                prevLayerValues: number[],
+                isLastLayer: boolean,
+                dampening: number,
+                momentum: number,
+                reluClip: number,
+                leakyReluAlpha: number,
+            ) {
+                const derivative = isLastLayer ? 
+                                outputDerivativeFunc(preActLayerValues[this.thread.x], reluClip, leakyReluAlpha) :
+                                derivativeFunc(preActLayerValues[this.thread.x], reluClip, leakyReluAlpha);
+
+                const gradient = layerErrors[this.thread.y] * derivative * prevLayerValues[this.thread.x];
+
+                return momentum * layerDeltas[this.thread.y][this.thread.x] + (1 - dampening) * gradient;
+
+            })
+            .setFunctions([
+                {
+                    source: derFuncSource,
+                    settings: {}
+                },
+                {
+                    source: outputDerFuncSource,
+                    settings: {}
+            }])
+            .setOutput([ prevLayerSize, layerSize  ]),
+
+            updateWeights: this.gpu.createKernel(function(
+                layerWeights: number[][],
+                learningRate: number,
+                layerDeltas: number[][]
+            ) {
+                return layerWeights[this.thread.y][this.thread.x] + learningRate * layerDeltas[this.thread.y][this.thread.x]
+            })
+            .setOutput([ prevLayerSize, layerSize ]),
+
+            addBiases: this.gpu.createKernel(function(
+                layerBiases: number[],
+                learningRate: number,
+                nodeError: number[]
+            ) {
+                return layerBiases[this.thread.x] + learningRate * nodeError[this.thread.x];
             })
             .setOutput([ layerSize ])
         }
