@@ -1,7 +1,7 @@
 {
   "name": "catbrain",
-  "version": "0.1.24",
-  "description": "Neural networks made simple for cats, if cats are Javascript developers",
+  "version": "0.1.25",
+  "description": "GPU accelerated neural networks made simple for Javascript",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

@@ -164,13 +164,14 @@ class CatBrain {
         return this.layerValues[this.layerValues.length - 1];
     }
     backPropagate(inputs, target, options) {
+        // Init
         const output = this.feedForward(inputs, options);
-        // Avoid lookups
-        const lastLayer = this.layerValues.length - 1;
+        const enableGPU = options?.enableGPU ?? false;
         const momentum = options?.momentum || this.momentum;
         const dampening = options?.dampening || this.dampening;
         const nesterov = options?.nesterov ?? this.nesterov;
         const learningRate = options?.learningRate || this.learningRate;
+        const lastLayer = this.layerValues.length - 1;
         for (let layer = lastLayer; layer >= 1; layer--) {
             // Avoid lookups
             const nextLayerSize = this.layers[layer + 1];
@@ -182,33 +183,48 @@ class CatBrain {
             const layerWeights = this.weights[layer];
             const layerBiases = this.biases[layer];
             const layerDeltas = this.deltas[layer];
-            const layerErrors = this.errors[layer];
             const prevLayerValues = this.layerValues[layer - 1];
             const prevLayerSize = this.layers[layer - 1];
             const isLastLayer = layer === lastLayer;
+            // Calculate errors
+            let layerErrors = this.errors[layer];
+            if (enableGPU) {
+                const { calculateErrors, calculateOutputErrors } = this.kernels[layer];
+                if (isLastLayer) {
+                    this.errors[layer] = Array.from(calculateOutputErrors(target, output));
+                }
+                else {
+                    this.errors[layer] = Array.from(calculateErrors(nextLayerSize, nextLayerWeights, nextLayerErrors));
+                }
+                layerErrors = this.errors[layer];
+            }
+            else {
+                for (let nodeIndex = 0; nodeIndex < layerSize; nodeIndex++) {
+                    // Calculate error
+                    layerErrors[nodeIndex] = 0;
+                    // Output layer error
+                    if (isLastLayer) {
+                        layerErrors[nodeIndex] = target[nodeIndex] - output[nodeIndex];
+                    }
+                    // Hidden layer error
+                    else {
+                        for (let nextNodeIndex = 0; nextNodeIndex < nextLayerSize; nextNodeIndex++) {
+                            layerErrors[nodeIndex] += nextLayerWeights[nextNodeIndex][nodeIndex] * nextLayerErrors[nextNodeIndex];
+                        }
+                    }
+                }
+            }
+            // Update weights for each node
             for (let nodeIndex = 0; nodeIndex < layerSize; nodeIndex++) {
+                const nodeWeights = layerWeights[nodeIndex];
+                const nodeDeltas = layerDeltas[nodeIndex];
+                const nodeError = layerErrors[nodeIndex];
                 // Calculate derivative ahead of time
                 const preActNeuron = preActLayerValues[nodeIndex];
                 const actNeuron = layerValues[nodeIndex];
                 const derivative = isLastLayer ?
                     this.outputDerivativeFunc(preActNeuron, actNeuron) :
                     this.derivativeFunc(preActNeuron, actNeuron);
-                // Calculate error
-                layerErrors[nodeIndex] = 0;
-                // Output layer error
-                if (layer === lastLayer) {
-                    layerErrors[nodeIndex] = target[nodeIndex] - output[nodeIndex];
-                }
-                // Hidden layer error
-                else {
-                    for (let nextNodeIndex = 0; nextNodeIndex < nextLayerSize; nextNodeIndex++) {
-                        layerErrors[nodeIndex] += nextLayerWeights[nextNodeIndex][nodeIndex] * nextLayerErrors[nextNodeIndex];
-                    }
-                }
-                // Update weights for each node
-                const nodeWeights = layerWeights[nodeIndex];
-                const nodeDeltas = layerDeltas[nodeIndex];
-                const nodeError = layerErrors[nodeIndex];
                 if (nesterov) {
                     for (let prevNodeIndex = 0; prevNodeIndex < prevLayerSize; prevNodeIndex++) {
                         const gradient = nodeError * derivative * prevLayerValues[prevNodeIndex];
@@ -289,6 +305,18 @@ class CatBrain {
                     settings: {}
                 }
             ])
+                .setOutput([layerSize]),
+            calculateErrors: this.gpu.createKernel(function (nextLayerSize, nextLayerWeights, nextLayerErrors) {
+                let errorSum = 0;
+                for (let nextNodeIndex = 0; nextNodeIndex < nextLayerSize; nextNodeIndex++) {
+                    errorSum += nextLayerWeights[nextNodeIndex][this.thread.x] * nextLayerErrors[nextNodeIndex];
+                }
+                return errorSum;
+            })
+                .setOutput([layerSize]),
+            calculateOutputErrors: this.gpu.createKernel(function (target, output) {
+                return target[this.thread.x] - output[this.thread.x];
+            })
                 .setOutput([layerSize])
         };
     }

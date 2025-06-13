@@ -1,6 +1,6 @@
 # CatBrain
 
-Neural networks made simple for Javascript with GPU acceleration, influenced by [Brain.js](https://github.com/BrainJS/brain.js).
+GPU accelerated neural networks made simple for Javascript, influenced by [Brain.js](https://github.com/BrainJS/brain.js).
 
 ## Setup
 
@@ -71,6 +71,7 @@ neuralNetwork.train(
     //     momentum: 0.1, // Will use original momentum if not provided
     //     dampening: 0.1, // Will use original dampening if not provided
     //     nesterov: 0.1, // Will use original nesterov if not provided
+    //     shuffle: true, // Will use original shuffle option if not provided
     //     // A function called before every iteration
     //     callback: (status) => {
     //         console.log(status.iteration)
@@ -81,6 +82,8 @@ neuralNetwork.train(
 
 // Run the neural net with our own input
 console.log(neuralNetwork.feedForward([1, 0]));
+// You can run it with GPU enabled:
+// console.log(neuralNetwork.feedForward([1, 0], { enableGPU: true }));
 
 // Export model to JSON
 // console.log(neuralNetwork.toJSON());

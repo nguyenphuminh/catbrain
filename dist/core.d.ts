@@ -15,6 +15,8 @@ export interface TrainingOptions {
 export interface LayerKernels {
     weightedSum: IKernelRunShortcut;
     activateLayer: IKernelRunShortcut;
+    calculateErrors: IKernelRunShortcut;
+    calculateOutputErrors: IKernelRunShortcut;
 }
 export interface CatBrainOptions {
     layers: number[];
@@ -69,6 +71,8 @@ export declare class CatBrain {
     initKernels(layerSize: number, activationFunc: Function, outputActivationFunc: Function): {
         weightedSum: IKernelRunShortcut;
         activateLayer: IKernelRunShortcut;
+        calculateErrors: IKernelRunShortcut;
+        calculateOutputErrors: IKernelRunShortcut;
     };
     toJSON(): string;
 }
