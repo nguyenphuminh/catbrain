@@ -9,9 +9,19 @@ Install through npm:
 npm install catbrain
 ```
 
+Note: Be sure to install **Python 3.9.0 specifically** or else node-gyp will scream. If it still screams, try:
+```sh
+export npm_config_python=/path/to/executable/python
+```
+
+or if you are on Windows:
+```bat
+set NODE_GYP_FORCE_PYTHON=/path/to/executable/python.exe
+```
+
 ## Tutorial
 
-Here is how to create, train, and run a neural net using Catbrain. All the options and config are shown as comments.
+Here is how to create, train, and run a neural net using CatBrain. All the options and config are shown as comments.
 ```js
 const { CatBrain } = require("catbrain");
 
@@ -50,7 +60,6 @@ const neuralNetwork = new CatBrain({
     // gpu.js options, this will be passed to the GPU constructor
     // gpuOptions: {}
     // Do note that this is heavily in-dev and not recommended for use at all currently
-    // In addition, Nesterov Accelerated Gradient is currently not supported for GPU
 });
 
 // Train
