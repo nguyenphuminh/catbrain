@@ -122,9 +122,10 @@ class CatBrain {
             const prevlayerSize = prevLayer.length;
             const isOutput = index === this.layers.length - 1;
             if (enableGPU) {
-                const { weightedSum, activateLayer } = this.kernels[index];
-                this.preActLayerValues[index] = Array.from(weightedSum(prevLayer, prevlayerSize, weights, biases));
-                this.layerValues[index] = Array.from(activateLayer(this.preActLayerValues[index], isOutput, this.reluClip, this.leakyReluAlpha));
+                const { weightedSumAndActivate } = this.kernels[index];
+                const { result, weightedSum } = weightedSumAndActivate(prevLayer, prevlayerSize, weights, biases, isOutput, this.reluClip, this.leakyReluAlpha);
+                this.preActLayerValues[index] = Array.from(weightedSum);
+                this.layerValues[index] = Array.from(result);
             }
             else {
                 const preActCurrentLayer = this.preActLayerValues[index];
@@ -175,7 +176,7 @@ class CatBrain {
             const prevLayerSize = this.layers[layer - 1];
             const isLastLayer = layer === lastLayer;
             if (enableGPU) {
-                const { calculateErrors, calculateOutputErrors, calculateDeltas, updateWeights, addBiases } = this.kernels[layer];
+                const { calculateErrors, calculateOutputErrors, updateWeights, addBiases } = this.kernels[layer];
                 // Calculate errors
                 if (isLastLayer) {
                     this.errors[layer] = Array.from(calculateOutputErrors(target, output));
@@ -183,10 +184,10 @@ class CatBrain {
                 else {
                     this.errors[layer] = Array.from(calculateErrors(nextLayerSize, nextLayerWeights, nextLayerErrors));
                 }
-                // Calculate deltas
-                this.deltas[layer] = calculateDeltas(layerDeltas, this.errors[layer], preActLayerValues, prevLayerValues, isLastLayer, dampening, momentum, this.reluClip, this.leakyReluAlpha).map(nodeDeltas => Array.from(nodeDeltas));
-                // Update weights
-                this.weights[layer] = updateWeights(layerWeights, learningRate, this.deltas[layer]).map(nodeWeights => Array.from(nodeWeights));
+                // Calculate deltas and update weights(
+                const { calculateDeltas, result } = updateWeights(layerWeights, layerDeltas, this.errors[layer], preActLayerValues, prevLayerValues, isLastLayer, nesterov, learningRate, dampening, momentum, this.reluClip, this.leakyReluAlpha);
+                this.deltas[layer] = calculateDeltas.map((nodeDeltas) => Array.from(nodeDeltas));
+                this.weights[layer] = result.map((nodeWeights) => Array.from(nodeWeights));
                 // Add biases
                 this.biases[layer] = Array.from(addBiases(layerBiases, learningRate, this.errors[layer]));
             }
@@ -271,19 +272,20 @@ class CatBrain {
         const outputActFuncSource = (0, utils_1.methodToFunc)(outputActivationFunc, "outputActivationFunc");
         const derFuncSource = (0, utils_1.methodToFunc)(derivativeFunc, "derivativeFunc");
         const outputDerFuncSource = (0, utils_1.methodToFunc)(outputDerivativeFunc, "outputDerivativeFunc");
+        function weightedSum(sum) { return sum; }
+        function calculateDeltas(delta) { return delta; }
         return {
-            weightedSum: this.gpu.createKernel(function (prevLayer, prevSize, weights, biases) {
+            weightedSumAndActivate: this.gpu.createKernelMap({
+                weightedSum
+            }, function (prevLayer, prevSize, weights, biases, isOutput, clip, alpha) {
                 let sum = biases[this.thread.x];
                 for (let index = 0; index < prevSize; index++) {
                     sum += prevLayer[index] * weights[this.thread.x][index];
                 }
-                return sum;
-            })
-                .setOutput([layerSize]),
-            activateLayer: this.gpu.createKernel(function (layer, isOutput, clip, alpha) {
+                weightedSum(sum);
                 if (isOutput)
-                    return outputActivationFunc(layer[this.thread.x], clip, alpha);
-                return activationFunc(layer[this.thread.x], clip, alpha);
+                    return outputActivationFunc(sum, clip, alpha);
+                return activationFunc(sum, clip, alpha);
             })
                 .setFunctions([
                 {
@@ -308,12 +310,21 @@ class CatBrain {
                 return target[this.thread.x] - output[this.thread.x];
             })
                 .setOutput([layerSize]),
-            calculateDeltas: this.gpu.createKernel(function (layerDeltas, layerErrors, preActLayerValues, prevLayerValues, isLastLayer, dampening, momentum, reluClip, leakyReluAlpha) {
+            updateWeights: this.gpu.createKernelMap({
+                calculateDeltas
+            }, function (layerWeights, layerDeltas, layerErrors, preActLayerValues, prevLayerValues, isLastLayer, nesterov, learningRate, dampening, momentum, reluClip, leakyReluAlpha) {
                 const derivative = isLastLayer ?
                     outputDerivativeFunc(preActLayerValues[this.thread.x], reluClip, leakyReluAlpha) :
                     derivativeFunc(preActLayerValues[this.thread.x], reluClip, leakyReluAlpha);
                 const gradient = layerErrors[this.thread.y] * derivative * prevLayerValues[this.thread.x];
-                return momentum * layerDeltas[this.thread.y][this.thread.x] + (1 - dampening) * gradient;
+                const effectiveGradient = (1 - dampening) * gradient;
+                let delta = momentum * layerDeltas[this.thread.y][this.thread.x] + effectiveGradient;
+                calculateDeltas(delta);
+                // Nesterov look-ahead
+                if (nesterov) {
+                    delta = momentum * delta + effectiveGradient;
+                }
+                return layerWeights[this.thread.y][this.thread.x] + learningRate * delta;
             })
                 .setFunctions([
                 {
@@ -325,10 +336,6 @@ class CatBrain {
                     settings: {}
                 }
             ])
-                .setOutput([prevLayerSize, layerSize]),
-            updateWeights: this.gpu.createKernel(function (layerWeights, learningRate, layerDeltas) {
-                return layerWeights[this.thread.y][this.thread.x] + learningRate * layerDeltas[this.thread.y][this.thread.x];
-            })
                 .setOutput([prevLayerSize, layerSize]),
             addBiases: this.gpu.createKernel(function (layerBiases, learningRate, nodeError) {
                 return layerBiases[this.thread.x] + learningRate * nodeError[this.thread.x];

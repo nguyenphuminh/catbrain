@@ -13,12 +13,10 @@ export interface TrainingOptions {
     callback?: (trainingStatus: TrainingStatus) => void;
 }
 export interface LayerKernels {
-    weightedSum: IKernelRunShortcut;
-    activateLayer: IKernelRunShortcut;
+    weightedSumAndActivate: any;
+    updateWeights: any;
     calculateErrors: IKernelRunShortcut;
     calculateOutputErrors: IKernelRunShortcut;
-    calculateDeltas: IKernelRunShortcut;
-    updateWeights: IKernelRunShortcut;
     addBiases: IKernelRunShortcut;
 }
 export interface CatBrainOptions {
@@ -72,12 +70,10 @@ export declare class CatBrain {
         outputs: number[];
     }[], options?: TrainingOptions): void;
     initKernels(layerSize: number, prevLayerSize: number, activationFunc: Function, outputActivationFunc: Function, derivativeFunc: Function, outputDerivativeFunc: Function): {
-        weightedSum: IKernelRunShortcut;
-        activateLayer: IKernelRunShortcut;
+        weightedSumAndActivate: ((this: import("gpu.js").IKernelFunctionThis<null>, prevLayer: number[], prevSize: number, weights: number[][], biases: number[], isOutput: boolean, clip: number, alpha: number) => import("gpu.js").IMappedKernelResult) & import("gpu.js").IKernelMapRunShortcut<import("gpu.js").ISubKernelObject>;
         calculateErrors: IKernelRunShortcut;
         calculateOutputErrors: IKernelRunShortcut;
-        calculateDeltas: IKernelRunShortcut;
-        updateWeights: IKernelRunShortcut;
+        updateWeights: ((this: import("gpu.js").IKernelFunctionThis<null>, layerWeights: number[][], layerDeltas: number[][], layerErrors: number[], preActLayerValues: number[], prevLayerValues: number[], isLastLayer: boolean, nesterov: boolean, learningRate: number, dampening: number, momentum: number, reluClip: number, leakyReluAlpha: number) => import("gpu.js").IMappedKernelResult) & import("gpu.js").IKernelMapRunShortcut<import("gpu.js").ISubKernelObject>;
         addBiases: IKernelRunShortcut;
     };
     toJSON(): string;
