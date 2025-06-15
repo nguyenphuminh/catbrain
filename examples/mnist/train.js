@@ -12,13 +12,18 @@ const testSet = set.test;
 // Create a CatBrain instance
 const neuralNetwork = new CatBrain({
     layers: [ 784, 256, 256, 256, 10 ], 
-    learningRate: 0.001
+    learningRate: 0.001,
+    nesterov: true
 });
 
 // Train
 console.log("Training...");
+const enableGPU = false;
+const normalizedSet = normalizeSet(trainingSet);
 const start = performance.now();
-neuralNetwork.train(1000, normalizeSet(trainingSet));
+neuralNetwork.train(1000, normalizedSet, {
+    enableGPU
+});
 console.log(`Training ended in ${performance.now() - start}ms`);
 
 // Calculate accuracy
@@ -36,8 +41,8 @@ function normalize(dataObject) {
     const output = dataObject.output || dataObject.outputs;
 
     return {
-        inputs: input.map(el => Math.round(el)),
-        outputs: output
+        inputs: Float32Array.from(input.map(el => Math.round(el))),
+        outputs: Float32Array.from(output)
     }
 }
 
@@ -49,8 +54,11 @@ function normalizeSet(dataSet) {
 
 function calculateAccuracy(testSet) {
     return testSet.filter(testObject => {
-        const expectedOutput = testObject.output;
-        const actualOutput = neuralNetwork.feedForward(testObject.input);
+        if (typeof testObject.input[0] === "undefined" || typeof testObject.output[0] === "undefined") return true;
+
+        const input = Float32Array.from(testObject.input);
+        const expectedOutput = Float32Array.from(testObject.output);
+        const actualOutput = Float32Array.from(neuralNetwork.feedForward(input, { enableGPU }));
 
         let expectedLabel = expectedOutput.indexOf(1);
 

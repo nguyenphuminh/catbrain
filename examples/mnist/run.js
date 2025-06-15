@@ -13,7 +13,7 @@ setInterval(() => {
     // Log out the image
     logImage(sample);
     // Test it out :)
-    console.log(`\nNumber: ${indexOfMaxValue(neuralNetwork.feedForward(sample))}`);
+    console.log(`\nNumber: ${indexOfMaxValue(neuralNetwork.feedForward(sample, { enableGPU: false }))}`);
     console.log("Next demo in 3 seconds...\n");
 }, 3000);
 
