@@ -1,40 +1,40 @@
 export class Activation {
     // Sigmoid function for activation
-    static sigmoid(x: number, reluClip?: number, leakyReluAlpha?: number) {
+    static sigmoid(x: number, reluClip?: number, leakyReluAlpha?: number): number {
         return 1 / (1 + Math.exp(-x));
     }
 
     // Sigmoid derivative
-    static sigmoidDerivative(x: number, reluClip?: number, leakyReluAlpha?: number) {
+    static sigmoidDerivative(x: number, reluClip?: number, leakyReluAlpha?: number): number {
         const sigmoid = 1 / (1 + Math.exp(-x));
 
         return sigmoid * (1 - sigmoid);
     }
 
     // Tanh function for activation
-    static tanh(x: number, reluClip?: number, leakyReluAlpha?: number) {
+    static tanh(x: number, reluClip?: number, leakyReluAlpha?: number): number {
         return Math.tanh(x);
     }
 
     // Tanh derivative
-    static tanhDerivative(x: number, reluClip?: number, leakyReluAlpha?: number) {
+    static tanhDerivative(x: number, reluClip?: number, leakyReluAlpha?: number): number {
         const tanh = Math.tanh(x);
 
         return 1 - tanh * tanh;
     }
 
     // Relu for activation
-    static relu(x: number, reluClip: number, leakyReluAlpha?: number) {
+    static relu(x: number, reluClip: number, leakyReluAlpha?: number): number {
         return Math.min(reluClip, Math.max(x, 0));
     }
 
     // Relu derivative
-    static reluDerivative(x: number, reluClip: number, leakyReluAlpha?: number) {
+    static reluDerivative(x: number, reluClip: number, leakyReluAlpha?: number): number {
         return 0 < x && x <= reluClip ? 1 : 0;
     }
 
     // Leaky Relu for activation
-    static leakyRelu(x: number, reluClip: number, leakyReluAlpha: number) {
+    static leakyRelu(x: number, reluClip: number, leakyReluAlpha: number): number {
         if (x > 0) {
             return Math.min(reluClip, x);
         } else if (x > -reluClip) {
@@ -45,13 +45,13 @@ export class Activation {
     }
 
     // Leaky Rely derivative
-    static leakyReluDerivative(x: number, reluClip: number, leakyReluAlpha: number) {
+    static leakyReluDerivative(x: number, reluClip: number, leakyReluAlpha: number): number {
         if (x > reluClip || x < -reluClip) return 0;
         return x > 0 ? 1 : leakyReluAlpha;
     }
 
     // Swish for activation
-    static swish(x: number, reluClip: number, leakyReluAlpha?: number) {
+    static swish(x: number, reluClip: number, leakyReluAlpha?: number): number {
         if (x > reluClip) {
             return reluClip / (1 + Math.exp(-reluClip));
         } else if (x < -reluClip) {
@@ -62,7 +62,7 @@ export class Activation {
     }
 
     // Swish derivative
-    static swishDerivative(x: number, reluClip: number, leakyReluAlpha?: number) {
+    static swishDerivative(x: number, reluClip: number, leakyReluAlpha?: number): number {
         if (x > reluClip || x < -reluClip) return 0;
         
         const sigmoid = 1 / (1 + Math.exp(-x));
@@ -70,7 +70,7 @@ export class Activation {
     }
 
     // Softplus for activation
-    static softplus(x: number, reluClip: number, leakyReluAlpha?: number) {
+    static softplus(x: number, reluClip: number, leakyReluAlpha?: number): number {
         if (x > reluClip) return Math.log1p(Math.exp(reluClip));
 
         return Math.log1p(Math.exp(x));
@@ -82,7 +82,7 @@ export class Activation {
     }
 
     // Mish
-    static mish(x: number, reluClip: number, leakyReluAlpha?: number) {
+    static mish(x: number, reluClip: number, leakyReluAlpha?: number): number {
         if (x > reluClip) {
             return reluClip * Math.tanh(Math.log1p(Math.exp(reluClip)));
         } else if (x < -reluClip) {
@@ -93,7 +93,7 @@ export class Activation {
     }
 
     // Mish derivative
-    static mishDerivative(x: number, reluClip: number, leakyReluAlpha?: number) {
+    static mishDerivative(x: number, reluClip: number, leakyReluAlpha?: number): number {
         if (x > reluClip || x < -reluClip) return 0;
 
         const softplus = Math.log1p(Math.exp(x));
@@ -105,12 +105,12 @@ export class Activation {
     }
 
     // No activation
-    static linear(x: number, reluClip?: number, leakyReluAlpha?: number) {
+    static linear(x: number, reluClip?: number, leakyReluAlpha?: number): number {
         return x;
     }
 
     // No activation's derivative is just 1
-    static linearDerivative(x?: number, reluClip?: number, leakyReluAlpha?: number) {
+    static linearDerivative(x?: number, reluClip?: number, leakyReluAlpha?: number): number {
         return 1;
     }
 }

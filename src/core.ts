@@ -1,4 +1,4 @@
-import { GPU, IGPUSettings, IKernelRunShortcut } from "gpu.js";
+import { GPU, IGPUSettings, IKernelMapRunShortcut, IKernelRunShortcut, KernelOutput } from "gpu.js";
 import { Activation } from "./activation";
 import { Rand, weightInitWithAct } from "./rand";
 import { methodToFunc, shuffle } from "./utils";
@@ -19,8 +19,8 @@ export interface TrainingOptions {
 }
 
 export interface LayerKernels {
-    weightedSumAndActivate: any; // I'm lazy, will fix later
-    updateWeights: any; // I'm lazy, will fix later
+    weightedSumAndActivate: IKernelMapRunShortcut<{ [key: string]: KernelOutput; }>;
+    updateWeights: IKernelMapRunShortcut<{ [key: string]: KernelOutput; }>;
     calculateErrors: IKernelRunShortcut;
     calculateOutputErrors: IKernelRunShortcut;
     addBiases: IKernelRunShortcut;
@@ -214,8 +214,8 @@ export class CatBrain {
                     this.leakyReluAlpha
                 );
 
-                this.preActLayerValues[index] = Array.from(weightedSum);
-                this.layerValues[index] = Array.from(result);
+                this.preActLayerValues[index] = Array.from(weightedSum as Float32Array);
+                this.layerValues[index] = Array.from(result as Float32Array);
             } else {
                 const preActCurrentLayer = this.preActLayerValues[index];
             
@@ -310,8 +310,8 @@ export class CatBrain {
                     this.leakyReluAlpha
                 );
 
-                this.deltas[layer] = calculateDeltas.map((nodeDeltas: Float32Array) => Array.from(nodeDeltas));
-                this.weights[layer] = result.map((nodeWeights: Float32Array) => Array.from(nodeWeights));
+                this.deltas[layer] = (calculateDeltas as Float32Array[]).map((nodeDeltas: Float32Array) => Array.from(nodeDeltas));
+                this.weights[layer] = (result as Float32Array[]).map((nodeWeights: Float32Array) => Array.from(nodeWeights));
 
                 // Add biases
                 this.biases[layer] = Array.from(addBiases(
@@ -422,7 +422,7 @@ export class CatBrain {
         outputActivationFunc: Function,
         derivativeFunc: Function,
         outputDerivativeFunc: Function
-    ) {
+    ): LayerKernels {
         const actFuncSource = methodToFunc(activationFunc, "activationFunc");
         const outputActFuncSource = methodToFunc(outputActivationFunc, "outputActivationFunc");
         const derFuncSource = methodToFunc(derivativeFunc, "derivativeFunc");

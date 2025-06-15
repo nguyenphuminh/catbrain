@@ -9,7 +9,7 @@ Install through npm:
 npm install catbrain
 ```
 
-Note: Be sure to install **Python 3.9.0 specifically** or else node-gyp will scream. If it still screams, try:
+Note: Be sure to have **Node18 and Python 3.9 specifically** already installed or else gpu.js and its deps can not be installed. If it still breaks, try:
 ```sh
 export npm_config_python=/path/to/executable/python
 ```
@@ -113,7 +113,7 @@ Currently what I have in mind are:
 * Proper GPU acceleration, possibly with CUDA/ROCm and Node C++ bindings.
 * More GD opimizers or different optimization algos.
 * More pre-built neural network architectures.
-* Code refactoring and optimization.
+* Code refactoring, test cases, and optimization.
 * Minor utilities for convenience.
 * More activation functions.
 

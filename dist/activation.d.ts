@@ -4,7 +4,7 @@ export declare class Activation {
     static tanh(x: number, reluClip?: number, leakyReluAlpha?: number): number;
     static tanhDerivative(x: number, reluClip?: number, leakyReluAlpha?: number): number;
     static relu(x: number, reluClip: number, leakyReluAlpha?: number): number;
-    static reluDerivative(x: number, reluClip: number, leakyReluAlpha?: number): 1 | 0;
+    static reluDerivative(x: number, reluClip: number, leakyReluAlpha?: number): number;
     static leakyRelu(x: number, reluClip: number, leakyReluAlpha: number): number;
     static leakyReluDerivative(x: number, reluClip: number, leakyReluAlpha: number): number;
     static swish(x: number, reluClip: number, leakyReluAlpha?: number): number;
