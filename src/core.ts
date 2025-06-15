@@ -550,7 +550,7 @@ export class CatBrain {
         }
     }
 
-    toJSON() {
+    toJSON(): string {
         const {
             layers,
 

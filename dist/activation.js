@@ -1,4 +1,5 @@
 "use strict";
+// Note that the unused variables are only there to enforce compatibility with gpu.js
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Activation = void 0;
 class Activation {

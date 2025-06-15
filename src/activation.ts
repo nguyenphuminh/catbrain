@@ -1,3 +1,5 @@
+// Note that the unused variables are only there to enforce compatibility with gpu.js
+
 export class Activation {
     // Sigmoid function for activation
     static sigmoid(x: number, reluClip?: number, leakyReluAlpha?: number): number {

@@ -7,7 +7,7 @@ export function shuffle(array: any[]) {
 };
 
 // Utility to convert a method of a class to a normal function based on source string
-export function methodToFunc(func: Function, name: string) {
+export function methodToFunc(func: Function, name: string): string {
     let push = false;
     let oldFuncSource = func.toString();
     let newFuncSource = "function ";
