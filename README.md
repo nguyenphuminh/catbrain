@@ -54,8 +54,9 @@ const neuralNetwork = new CatBrain({
 
     // Options to load existing models, randomly initialized depends on activation if not provided
     // Though, do note that biases are initialized as 0
-    // weights: number[][][],
-    // biases: number[][]
+    // weights: ArrayLike<number>[][],
+    // biases: ArrayLike<number>[],
+    // deltas: ArrayLike<number>[][], // Load this if you want to resume training
 
     // gpu.js options, this will be passed to the GPU constructor
     // gpuOptions: {}

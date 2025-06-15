@@ -8,8 +8,6 @@ const utils_1 = require("./utils");
 class CatBrain {
     // Mostly for external use
     layers;
-    weights;
-    biases;
     weightInit;
     activation;
     outputActivation;
@@ -27,10 +25,13 @@ class CatBrain {
     derivativeFunc;
     outputActivationFunc;
     outputDerivativeFunc;
+    // To be exported
+    weights;
+    biases;
+    deltas;
     layerValues;
     preActLayerValues;
     errors;
-    deltas;
     kernels;
     gpu;
     constructor(options) {
@@ -56,43 +57,47 @@ class CatBrain {
         this.weightInit = options.weightInit || rand_1.weightInitWithAct[this.activation] || "basicUniform";
         const weightInit = rand_1.Rand[this.weightInit];
         // Init layers with the configured size and set them to 0s at first
-        this.layerValues = this.layers.map(layerSize => new Array(layerSize).fill(0));
+        this.layerValues = this.layers.map(layerSize => new Float32Array(layerSize).fill(0));
         // Init preactivation layers
         this.preActLayerValues = Array.from({ length: this.layers.length }, (layer, layerIndex) => {
             if (layerIndex === 0)
                 return null;
-            return new Array(this.layers[layerIndex]).fill(0);
+            return new Float32Array(this.layers[layerIndex]).fill(0);
         });
         // Init a list of randomized weights for each node of each layer
-        this.weights = options.weights || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
-            if (layerIndex === 0)
-                return null;
-            const outSize = this.layers[layerIndex];
-            return Array.from({ length: outSize }, () => {
-                const inSize = this.layers[layerIndex - 1];
-                return Array.from({ length: inSize }, () => weightInit(inSize, outSize));
-            });
-        });
+        this.weights = (options.weights?.map(layerWeights => layerWeights ? layerWeights.map(nodeWeights => Float32Array.from(nodeWeights)) : layerWeights) ||
+            Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+                if (layerIndex === 0)
+                    return null;
+                const outSize = this.layers[layerIndex];
+                return Array.from({ length: outSize }, () => {
+                    const inSize = this.layers[layerIndex - 1];
+                    return Float32Array.from({ length: inSize }, () => weightInit(inSize, outSize));
+                });
+            }));
         // Init a list of biases for each node of each layer
-        this.biases = options.biases || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
-            if (layerIndex === 0)
-                return null;
-            return new Array(this.layers[layerIndex]).fill(0);
-        });
+        this.biases = (options.biases?.map(nodeBiases => nodeBiases ? Float32Array.from(nodeBiases) : nodeBiases) ||
+            Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+                if (layerIndex === 0)
+                    return null;
+                return new Float32Array(this.layers[layerIndex]).fill(0);
+            }));
+        // Deltas (velocity) for momentum
+        this.deltas = (options.deltas?.map(layerDeltas => layerDeltas ? layerDeltas.map(nodeDeltas => Float32Array.from(nodeDeltas)) : layerDeltas) ||
+            Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+                if (layerIndex === 0)
+                    return null;
+                return Array.from({ length: this.layers[layerIndex] }, () => {
+                    return Float32Array.from({ length: this.layers[layerIndex - 1] }, () => 0);
+                });
+            }));
         // Errors cache
         this.errors = Array.from({ length: this.layers.length }, (layer, layerIndex) => {
             if (layerIndex === 0)
                 return null;
-            return new Array(this.layers[layerIndex]).fill(0);
+            return new Float32Array(this.layers[layerIndex]).fill(0);
         });
-        // Deltas (velocity) for momentum
-        this.deltas = options.weights || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
-            if (layerIndex === 0)
-                return null;
-            return Array.from({ length: this.layers[layerIndex] }, () => {
-                return Array.from({ length: this.layers[layerIndex - 1] }, () => 0);
-            });
-        });
+        // GPU configuration
         // Init GPU
         this.gpuOptions = options.gpuOptions || {};
         this.gpu = new gpu_js_1.GPU({ ...this.gpuOptions });
@@ -109,7 +114,7 @@ class CatBrain {
     feedForward(inputs, options) {
         const enableGPU = options?.enableGPU ?? false;
         // Feed new inputs to our first (input) layer
-        this.layerValues[0] = inputs;
+        this.layerValues[0] = inputs instanceof Float32Array ? inputs : Float32Array.from(inputs);
         // Propagate layers with layers behind them
         const layers = this.layerValues.length;
         for (let index = 1; index < layers; index++) {
@@ -124,8 +129,8 @@ class CatBrain {
             if (enableGPU) {
                 const { weightedSumAndActivate } = this.kernels[index];
                 const { result, weightedSum } = weightedSumAndActivate(prevLayer, prevlayerSize, weights, biases, isOutput, this.reluClip, this.leakyReluAlpha);
-                this.preActLayerValues[index] = Array.from(weightedSum);
-                this.layerValues[index] = Array.from(result);
+                this.preActLayerValues[index] = weightedSum;
+                this.layerValues[index] = result;
             }
             else {
                 const preActCurrentLayer = this.preActLayerValues[index];
@@ -152,8 +157,9 @@ class CatBrain {
         }
         return this.layerValues[this.layerValues.length - 1];
     }
-    backPropagate(inputs, target, options) {
+    backPropagate(inputs, targetInput, options) {
         // Init
+        const target = targetInput instanceof Float32Array ? targetInput : Float32Array.from(targetInput);
         const output = this.feedForward(inputs, options);
         const enableGPU = options?.enableGPU ?? false;
         const momentum = options?.momentum || this.momentum;
@@ -179,17 +185,19 @@ class CatBrain {
                 const { calculateErrors, calculateOutputErrors, updateWeights, addBiases } = this.kernels[layer];
                 // Calculate errors
                 if (isLastLayer) {
-                    this.errors[layer] = Array.from(calculateOutputErrors(target, output));
+                    this.errors[layer] = calculateOutputErrors(target, output);
                 }
                 else {
-                    this.errors[layer] = Array.from(calculateErrors(nextLayerSize, nextLayerWeights, nextLayerErrors));
+                    this.errors[layer] = calculateErrors(nextLayerSize, nextLayerWeights, nextLayerErrors);
                 }
                 // Calculate deltas and update weights(
                 const { calculateDeltas, result } = updateWeights(layerWeights, layerDeltas, this.errors[layer], preActLayerValues, prevLayerValues, isLastLayer, nesterov, learningRate, dampening, momentum, this.reluClip, this.leakyReluAlpha);
-                this.deltas[layer] = calculateDeltas.map((nodeDeltas) => Array.from(nodeDeltas));
-                this.weights[layer] = result.map((nodeWeights) => Array.from(nodeWeights));
+                this.deltas[layer] = calculateDeltas;
+                this.weights[layer] = result;
                 // Add biases
-                this.biases[layer] = Array.from(addBiases(layerBiases, learningRate, this.errors[layer]));
+                this.biases[layer] = addBiases(layerBiases, learningRate, this.errors[layer]);
+                // this.biases[layer] = Array.from(gpuBiases);
+                // console.log(gpuBiases, this.biases[layer]);
             }
             else {
                 // Calculate errors
@@ -252,10 +260,14 @@ class CatBrain {
             (0, utils_1.shuffle)(trainingData);
         let dataObjectIndex = 0;
         for (let iteration = 0; iteration < iterations; iteration++) {
+            // Call custom callback function
             if (typeof options?.callback === "function")
                 options.callback({ iteration });
+            // Backprop training
             const data = trainingData[dataObjectIndex];
-            this.backPropagate(data.inputs, data.outputs, trainingOptions);
+            const inputs = data.inputs instanceof Float32Array ? data.inputs : Float32Array.from(data.inputs);
+            const outputs = data.outputs instanceof Float32Array ? data.outputs : Float32Array.from(data.outputs);
+            this.backPropagate(inputs, outputs, trainingOptions);
             // If we have gone through all of the dataset, reshuffle it and continue training
             if (dataObjectIndex === trainingData.length - 1) {
                 if (trainingOptions.shuffle)
@@ -297,7 +309,9 @@ class CatBrain {
                     settings: {}
                 }
             ])
-                .setOutput([layerSize]),
+                .setOutput([layerSize])
+                .setOptimizeFloatMemory(true)
+                .setTactic("precision"),
             calculateErrors: this.gpu.createKernel(function (nextLayerSize, nextLayerWeights, nextLayerErrors) {
                 let errorSum = 0;
                 for (let nextNodeIndex = 0; nextNodeIndex < nextLayerSize; nextNodeIndex++) {
@@ -305,11 +319,15 @@ class CatBrain {
                 }
                 return errorSum;
             })
-                .setOutput([layerSize]),
+                .setOutput([layerSize])
+                .setOptimizeFloatMemory(true)
+                .setTactic("precision"),
             calculateOutputErrors: this.gpu.createKernel(function (target, output) {
                 return target[this.thread.x] - output[this.thread.x];
             })
-                .setOutput([layerSize]),
+                .setOutput([layerSize])
+                .setOptimizeFloatMemory(true)
+                .setTactic("precision"),
             updateWeights: this.gpu.createKernelMap({
                 calculateDeltas
             }, function (layerWeights, layerDeltas, layerErrors, preActLayerValues, prevLayerValues, isLastLayer, nesterov, learningRate, dampening, momentum, reluClip, leakyReluAlpha) {
@@ -336,19 +354,24 @@ class CatBrain {
                     settings: {}
                 }
             ])
-                .setOutput([prevLayerSize, layerSize]),
+                .setOutput([prevLayerSize, layerSize])
+                .setOptimizeFloatMemory(true)
+                .setTactic("precision"),
             addBiases: this.gpu.createKernel(function (layerBiases, learningRate, nodeError) {
                 return layerBiases[this.thread.x] + learningRate * nodeError[this.thread.x];
             })
                 .setOutput([layerSize])
+                .setOptimizeFloatMemory(true)
+                .setTactic("precision")
         };
     }
     toJSON() {
-        const { layers, weights, biases, weightInit, activation, outputActivation, leakyReluAlpha, reluClip, momentum, dampening, nesterov, learningRate, decayRate, shuffle, gpuOptions } = this;
+        const { layers, weights, biases, deltas, weightInit, activation, outputActivation, leakyReluAlpha, reluClip, momentum, dampening, nesterov, learningRate, decayRate, shuffle, gpuOptions } = this;
         return JSON.stringify({
             layers,
-            weights,
-            biases,
+            weights: weights.map(layerWeights => layerWeights ? layerWeights.map(nodeWeights => Float32Array.from(nodeWeights)) : layerWeights),
+            biases: biases.map(nodeBiases => nodeBiases ? Float32Array.from(nodeBiases) : nodeBiases),
+            deltas: deltas.map(layerDeltas => layerDeltas ? layerDeltas.map(nodeDeltas => Float32Array.from(nodeDeltas)) : layerDeltas),
             weightInit,
             activation,
             outputActivation,

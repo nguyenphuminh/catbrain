@@ -31,8 +31,9 @@ export interface CatBrainOptions {
     layers: number[];
 
     // Self-submit weights and biases
-    weights?: number[][][];
-    biases?: number[][];
+    weights?: ArrayLike<number>[][];
+    biases?: ArrayLike<number>[];
+    deltas?: ArrayLike<number>[][];
     weightInit?: string;
 
     // Activation configuration
@@ -56,9 +57,6 @@ export interface CatBrainOptions {
 export class CatBrain {
     // Mostly for external use
     public layers: number[];
-
-    public weights: number[][][];
-    public biases: number[][];
     public weightInit: string;
 
     public activation: string;
@@ -81,10 +79,14 @@ export class CatBrain {
     public outputActivationFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
     public outputDerivativeFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
 
-    public layerValues: number[][];
-    public preActLayerValues: number[][];
-    public errors: number[][];
-    public deltas: number[][][];
+    // To be exported
+    public weights: Float32Array[][];
+    public biases: Float32Array[];
+    public deltas: Float32Array[][];
+
+    public layerValues: Float32Array[];
+    public preActLayerValues: Float32Array[];
+    public errors: Float32Array[];
     public kernels: LayerKernels[];
     public gpu: GPU;
 
@@ -110,6 +112,7 @@ export class CatBrain {
         this.outputActivationFunc = (Activation as Record<string, any>)[this.outputActivation] || Activation.sigmoid;
         this.outputDerivativeFunc = (Activation as Record<string, any>)[this.outputActivation + "Derivative"] || Activation.sigmoidDerivative;
 
+
         // Model configuration
         this.layers = options.layers;
 
@@ -118,47 +121,60 @@ export class CatBrain {
         const weightInit: (inSize: number, outSize?: number) => number = (Rand as Record<string, any>)[this.weightInit];
 
         // Init layers with the configured size and set them to 0s at first
-        this.layerValues = this.layers.map(layerSize => new Array(layerSize).fill(0));
+        this.layerValues = this.layers.map(layerSize => new Float32Array(layerSize).fill(0));
         // Init preactivation layers
         this.preActLayerValues = Array.from({ length: this.layers.length }, (layer, layerIndex) => { 
-            if (layerIndex === 0) return null as unknown as number[];
+            if (layerIndex === 0) return null as unknown as Float32Array;
 
-            return new Array(this.layers[layerIndex]).fill(0);
+            return new Float32Array(this.layers[layerIndex]).fill(0);
         });
         // Init a list of randomized weights for each node of each layer
-        this.weights = options.weights || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
-            if (layerIndex === 0) return null as unknown as number[][];
+        this.weights = (
+            options.weights?.map(layerWeights => layerWeights ? layerWeights.map(nodeWeights => Float32Array.from(nodeWeights)) : layerWeights) ||
+            Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+                if (layerIndex === 0) return null as unknown as Float32Array[];
 
-            const outSize = this.layers[layerIndex];
+                const outSize = this.layers[layerIndex];
 
-            return Array.from({ length: outSize }, () => {
-                const inSize = this.layers[layerIndex - 1];
+                return Array.from({ length: outSize }, () => {
+                    const inSize = this.layers[layerIndex - 1];
 
-                return Array.from({ length: inSize }, () => weightInit(inSize, outSize));
+                    return Float32Array.from({ length: inSize }, () => weightInit(inSize, outSize));
+                })
             })
-        });
+        );
         // Init a list of biases for each node of each layer
-        this.biases = options.biases || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
-            if (layerIndex === 0) return null as unknown as number[];
+        this.biases = (
+            options.biases?.map(nodeBiases => nodeBiases ? Float32Array.from(nodeBiases) : nodeBiases) || 
+            Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+                if (layerIndex === 0) return null as unknown as Float32Array;
 
-            return new Array(this.layers[layerIndex]).fill(0);
-        });
+                return new Float32Array(this.layers[layerIndex]).fill(0);
+            })
+        );
+        // Deltas (velocity) for momentum
+        this.deltas = (
+            options.deltas?.map(layerDeltas => layerDeltas ? layerDeltas.map(nodeDeltas => Float32Array.from(nodeDeltas)) : layerDeltas) ||
+            Array.from({ length: this.layers.length }, (layer, layerIndex) => {
+                if (layerIndex === 0) return null as unknown as Float32Array[];
+                
+                return Array.from({ length: this.layers[layerIndex] }, () => {
+                    return Float32Array.from({ length: this.layers[layerIndex - 1] }, () => 0);
+                })
+            })
+        );
         // Errors cache
         this.errors = Array.from({ length: this.layers.length }, (layer, layerIndex) => { 
-            if (layerIndex === 0) return null as unknown as number[];
+            if (layerIndex === 0) return null as unknown as Float32Array;
 
-            return new Array(this.layers[layerIndex]).fill(0);
-        });
-        // Deltas (velocity) for momentum
-        this.deltas = options.weights || Array.from({ length: this.layers.length }, (layer, layerIndex) => {
-            if (layerIndex === 0) return null as unknown as number[][];
-            
-            return Array.from({ length: this.layers[layerIndex] }, () => {
-                return Array.from({ length: this.layers[layerIndex - 1] }, () => 0);
-            })
+            return new Float32Array(this.layers[layerIndex]).fill(0);
         });
 
-         // Init GPU
+
+
+        // GPU configuration
+
+        // Init GPU
         this.gpuOptions = options.gpuOptions || {};
         this.gpu = new GPU({ ...this.gpuOptions });
 
@@ -182,11 +198,11 @@ export class CatBrain {
                                 User APIs
     //////////////////////////////////////////////////////////////*/
 
-    feedForward(inputs: number[], options?: TrainingOptions): number[] {
+    feedForward(inputs: ArrayLike<number>, options?: TrainingOptions): Float32Array {
         const enableGPU = options?.enableGPU ?? false;
 
         // Feed new inputs to our first (input) layer
-        this.layerValues[0] = inputs;
+        this.layerValues[0] = inputs instanceof Float32Array ? inputs : Float32Array.from(inputs);
 
         // Propagate layers with layers behind them
         const layers = this.layerValues.length;
@@ -214,8 +230,8 @@ export class CatBrain {
                     this.leakyReluAlpha
                 );
 
-                this.preActLayerValues[index] = Array.from(weightedSum as Float32Array);
-                this.layerValues[index] = Array.from(result as Float32Array);
+                this.preActLayerValues[index] = weightedSum as Float32Array;
+                this.layerValues[index] = result as Float32Array;
             } else {
                 const preActCurrentLayer = this.preActLayerValues[index];
             
@@ -247,8 +263,9 @@ export class CatBrain {
         return this.layerValues[this.layerValues.length-1];
     }
 
-    backPropagate(inputs: number[], target: number[], options: TrainingOptions) {
+    backPropagate(inputs: ArrayLike<number>, targetInput: ArrayLike<number>, options: TrainingOptions) {
         // Init
+        const target = targetInput instanceof Float32Array ? targetInput : Float32Array.from(targetInput);
         const output = this.feedForward(inputs, options);
         const enableGPU = options?.enableGPU ?? false;
         const momentum = options?.momentum || this.momentum;
@@ -282,16 +299,16 @@ export class CatBrain {
 
                 // Calculate errors
                 if (isLastLayer) {
-                    this.errors[layer] = Array.from(calculateOutputErrors(
+                    this.errors[layer] = calculateOutputErrors(
                         target,
                         output
-                    ) as Float32Array);
+                    ) as Float32Array;
                 } else {
-                    this.errors[layer] = Array.from(calculateErrors(
+                    this.errors[layer] = calculateErrors(
                         nextLayerSize,
                         nextLayerWeights,
                         nextLayerErrors
-                    ) as Float32Array);
+                    ) as Float32Array;
                 }
 
                 // Calculate deltas and update weights(
@@ -310,15 +327,18 @@ export class CatBrain {
                     this.leakyReluAlpha
                 );
 
-                this.deltas[layer] = (calculateDeltas as Float32Array[]).map((nodeDeltas: Float32Array) => Array.from(nodeDeltas));
-                this.weights[layer] = (result as Float32Array[]).map((nodeWeights: Float32Array) => Array.from(nodeWeights));
+                this.deltas[layer] = calculateDeltas as Float32Array[];
+                this.weights[layer] = result as Float32Array[];
 
                 // Add biases
-                this.biases[layer] = Array.from(addBiases(
+                this.biases[layer] = addBiases(
                     layerBiases,
                     learningRate,
                     this.errors[layer]
-                ) as Float32Array);
+                ) as Float32Array;
+
+                // this.biases[layer] = Array.from(gpuBiases);
+                // console.log(gpuBiases, this.biases[layer]);
             } else {
                 // Calculate errors
                 for (let nodeIndex = 0; nodeIndex < layerSize; nodeIndex++) {
@@ -378,7 +398,7 @@ export class CatBrain {
 
     train(
         iterations: number,
-        trainingData: { inputs: number[], outputs: number[] }[],
+        trainingData: { inputs: ArrayLike<number>, outputs: ArrayLike<number> }[],
         options?: TrainingOptions
     ) {
         const trainingOptions = {
@@ -397,10 +417,14 @@ export class CatBrain {
         let dataObjectIndex = 0;
 
         for (let iteration = 0; iteration < iterations; iteration++) {
+            // Call custom callback function
             if (typeof options?.callback === "function") options.callback({ iteration });
 
+            // Backprop training
             const data = trainingData[dataObjectIndex];
-            this.backPropagate(data.inputs, data.outputs, trainingOptions);
+            const inputs = data.inputs instanceof Float32Array ? data.inputs : Float32Array.from(data.inputs);
+            const outputs = data.outputs instanceof Float32Array ? data.outputs : Float32Array.from(data.outputs);
+            this.backPropagate(inputs, outputs, trainingOptions);
 
             // If we have gone through all of the dataset, reshuffle it and continue training
             if (dataObjectIndex === trainingData.length - 1) {
@@ -437,10 +461,10 @@ export class CatBrain {
                     weightedSum
                 },
                 function(
-                    prevLayer: number[],
+                    prevLayer: Float32Array,
                     prevSize: number,
-                    weights: number[][],
-                    biases: number[],
+                    weights: Float32Array[],
+                    biases: Float32Array,
                     isOutput: boolean,
                     clip: number,
                     alpha: number
@@ -466,13 +490,16 @@ export class CatBrain {
                 {
                     source: outputActFuncSource,
                     settings: {}
-            }])
-            .setOutput([ layerSize ]),
+                }
+            ])
+            .setOutput([ layerSize ])
+            .setOptimizeFloatMemory(true)
+            .setTactic("precision"),
 
             calculateErrors: this.gpu.createKernel(function(
                 nextLayerSize: number,
-                nextLayerWeights: number[][],
-                nextLayerErrors: number[]
+                nextLayerWeights: Float32Array[],
+                nextLayerErrors: Float32Array
             ) {
                 let errorSum = 0;
 
@@ -482,26 +509,30 @@ export class CatBrain {
 
                 return errorSum;
             })
-            .setOutput([ layerSize ]),
+            .setOutput([ layerSize ])
+            .setOptimizeFloatMemory(true)
+            .setTactic("precision"),
 
             calculateOutputErrors: this.gpu.createKernel(function(
-                target: number[],
-                output: number[],
+                target: Float32Array,
+                output: Float32Array,
             ) {
                 return target[this.thread.x] - output[this.thread.x];
             })
-            .setOutput([ layerSize ]),
+            .setOutput([ layerSize ])
+            .setOptimizeFloatMemory(true)
+            .setTactic("precision"),
 
             updateWeights: this.gpu.createKernelMap(
                 {
                     calculateDeltas
                 },
                 function(
-                    layerWeights: number[][],
-                    layerDeltas: number[][],
-                    layerErrors: number[],
-                    preActLayerValues: number[],
-                    prevLayerValues: number[],
+                    layerWeights: Float32Array[],
+                    layerDeltas: Float32Array[],
+                    layerErrors: Float32Array,
+                    preActLayerValues: Float32Array,
+                    prevLayerValues: Float32Array,
                     isLastLayer: boolean,
                     nesterov: boolean,
                     learningRate: number,
@@ -537,16 +568,20 @@ export class CatBrain {
                     source: outputDerFuncSource,
                     settings: {}
             }])
-            .setOutput([ prevLayerSize, layerSize ]),
+            .setOutput([ prevLayerSize, layerSize ])
+            .setOptimizeFloatMemory(true)
+            .setTactic("precision"),
 
             addBiases: this.gpu.createKernel(function(
-                layerBiases: number[],
+                layerBiases: Float32Array,
                 learningRate: number,
-                nodeError: number[]
+                nodeError: Float32Array
             ) {
                 return layerBiases[this.thread.x] + learningRate * nodeError[this.thread.x];
             })
             .setOutput([ layerSize ])
+            .setOptimizeFloatMemory(true)
+            .setTactic("precision")
         }
     }
 
@@ -556,6 +591,7 @@ export class CatBrain {
 
             weights,
             biases,
+            deltas,
             weightInit,
 
             activation,
@@ -576,8 +612,9 @@ export class CatBrain {
         return JSON.stringify({
             layers,
 
-            weights,
-            biases,
+            weights: weights.map(layerWeights => layerWeights ? layerWeights.map(nodeWeights => Float32Array.from(nodeWeights)) : layerWeights),
+            biases: biases.map(nodeBiases => nodeBiases ? Float32Array.from(nodeBiases) : nodeBiases),
+            deltas: deltas.map(layerDeltas => layerDeltas ? layerDeltas.map(nodeDeltas => Float32Array.from(nodeDeltas)) : layerDeltas),
             weightInit,
 
             activation,

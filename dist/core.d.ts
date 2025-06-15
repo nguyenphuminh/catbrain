@@ -25,8 +25,9 @@ export interface LayerKernels {
 }
 export interface CatBrainOptions {
     layers: number[];
-    weights?: number[][][];
-    biases?: number[][];
+    weights?: ArrayLike<number>[][];
+    biases?: ArrayLike<number>[];
+    deltas?: ArrayLike<number>[][];
     weightInit?: string;
     activation?: string;
     outputActivation?: string;
@@ -42,8 +43,6 @@ export interface CatBrainOptions {
 }
 export declare class CatBrain {
     layers: number[];
-    weights: number[][][];
-    biases: number[][];
     weightInit: string;
     activation: string;
     outputActivation: string;
@@ -60,18 +59,20 @@ export declare class CatBrain {
     derivativeFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
     outputActivationFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
     outputDerivativeFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
-    layerValues: number[][];
-    preActLayerValues: number[][];
-    errors: number[][];
-    deltas: number[][][];
+    weights: Float32Array[][];
+    biases: Float32Array[];
+    deltas: Float32Array[][];
+    layerValues: Float32Array[];
+    preActLayerValues: Float32Array[];
+    errors: Float32Array[];
     kernels: LayerKernels[];
     gpu: GPU;
     constructor(options: CatBrainOptions);
-    feedForward(inputs: number[], options?: TrainingOptions): number[];
-    backPropagate(inputs: number[], target: number[], options: TrainingOptions): void;
+    feedForward(inputs: ArrayLike<number>, options?: TrainingOptions): Float32Array;
+    backPropagate(inputs: ArrayLike<number>, targetInput: ArrayLike<number>, options: TrainingOptions): void;
     train(iterations: number, trainingData: {
-        inputs: number[];
-        outputs: number[];
+        inputs: ArrayLike<number>;
+        outputs: ArrayLike<number>;
     }[], options?: TrainingOptions): void;
     initKernels(layerSize: number, prevLayerSize: number, activationFunc: Function, outputActivationFunc: Function, derivativeFunc: Function, outputDerivativeFunc: Function): LayerKernels;
     toJSON(): string;
