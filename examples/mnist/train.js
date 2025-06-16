@@ -12,8 +12,7 @@ const testSet = set.test;
 // Create a CatBrain instance
 const neuralNetwork = new CatBrain({
     layers: [ 784, 256, 256, 256, 10 ], 
-    learningRate: 0.001,
-    nesterov: true
+    learningRate: 0.001
 });
 
 // Train
@@ -21,7 +20,7 @@ console.log("Training...");
 const enableGPU = false;
 const normalizedSet = normalizeSet(trainingSet);
 const start = performance.now();
-neuralNetwork.train(1000, normalizedSet, {
+neuralNetwork.train(300000, normalizedSet, {
     enableGPU
 });
 console.log(`Training ended in ${performance.now() - start}ms`);
