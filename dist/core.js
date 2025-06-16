@@ -369,9 +369,9 @@ class CatBrain {
         const { layers, weights, biases, deltas, weightInit, activation, outputActivation, leakyReluAlpha, reluClip, momentum, dampening, nesterov, learningRate, decayRate, shuffle, gpuOptions } = this;
         return JSON.stringify({
             layers,
-            weights: weights.map(layerWeights => layerWeights ? layerWeights.map(nodeWeights => Float32Array.from(nodeWeights)) : layerWeights),
-            biases: biases.map(nodeBiases => nodeBiases ? Float32Array.from(nodeBiases) : nodeBiases),
-            deltas: deltas.map(layerDeltas => layerDeltas ? layerDeltas.map(nodeDeltas => Float32Array.from(nodeDeltas)) : layerDeltas),
+            weights: weights.map(layerWeights => layerWeights ? layerWeights.map(nodeWeights => Array.from(nodeWeights)) : layerWeights),
+            biases: biases.map(nodeBiases => nodeBiases ? Array.from(nodeBiases) : nodeBiases),
+            deltas: deltas.map(layerDeltas => layerDeltas ? layerDeltas.map(nodeDeltas => Array.from(nodeDeltas)) : layerDeltas),
             weightInit,
             activation,
             outputActivation,

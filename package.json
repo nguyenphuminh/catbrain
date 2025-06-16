@@ -1,6 +1,6 @@
 {
   "name": "catbrain",
-  "version": "0.1.29",
+  "version": "0.1.30",
   "description": "GPU accelerated neural networks made simple for Javascript",
   "main": "index.js",
   "scripts": {
