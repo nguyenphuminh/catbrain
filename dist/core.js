@@ -311,7 +311,8 @@ class CatBrain {
             ])
                 .setOutput([layerSize])
                 .setOptimizeFloatMemory(true)
-                .setTactic("precision"),
+                .setTactic("precision")
+                .setPrecision("single"),
             calculateErrors: this.gpu.createKernel(function (nextLayerSize, nextLayerWeights, nextLayerErrors) {
                 let errorSum = 0;
                 for (let nextNodeIndex = 0; nextNodeIndex < nextLayerSize; nextNodeIndex++) {
@@ -321,13 +322,15 @@ class CatBrain {
             })
                 .setOutput([layerSize])
                 .setOptimizeFloatMemory(true)
-                .setTactic("precision"),
+                .setTactic("precision")
+                .setPrecision("single"),
             calculateOutputErrors: this.gpu.createKernel(function (target, output) {
                 return target[this.thread.x] - output[this.thread.x];
             })
                 .setOutput([layerSize])
                 .setOptimizeFloatMemory(true)
-                .setTactic("precision"),
+                .setTactic("precision")
+                .setPrecision("single"),
             updateWeights: this.gpu.createKernelMap({
                 calculateDeltas
             }, function (layerWeights, layerDeltas, layerErrors, preActLayerValues, prevLayerValues, isLastLayer, nesterov, learningRate, dampening, momentum, reluClip, leakyReluAlpha) {
@@ -356,13 +359,15 @@ class CatBrain {
             ])
                 .setOutput([prevLayerSize, layerSize])
                 .setOptimizeFloatMemory(true)
-                .setTactic("precision"),
+                .setTactic("precision")
+                .setPrecision("single"),
             addBiases: this.gpu.createKernel(function (layerBiases, learningRate, nodeError) {
                 return layerBiases[this.thread.x] + learningRate * nodeError[this.thread.x];
             })
                 .setOutput([layerSize])
                 .setOptimizeFloatMemory(true)
                 .setTactic("precision")
+                .setPrecision("single")
         };
     }
     toJSON() {

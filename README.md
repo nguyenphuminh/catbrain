@@ -9,7 +9,7 @@ Install through npm:
 npm install catbrain
 ```
 
-Note: Be sure to have **Node18 and Python 3.9 specifically** already installed or else gpu.js and its deps can not be installed. If it still breaks, try:
+Note: Be sure to have Python (and VS build tools if you are on Windows) already installed or else gpu.js and its deps can not be installed. If things break, try an older Python version and point to that version specifically:
 ```sh
 export npm_config_python=/path/to/executable/python
 ```
@@ -18,6 +18,8 @@ or if you are on Windows:
 ```bat
 set NODE_GYP_FORCE_PYTHON=/path/to/executable/python.exe
 ```
+
+If the issue still persists, try other Node/Python/VS versions (Node18, Python 3.9, and VS2022 should work fine) and check [gpu.js installation requirements](https://github.com/gpujs/gpu.js?tab=readme-ov-file#installation).
 
 ## Tutorial
 

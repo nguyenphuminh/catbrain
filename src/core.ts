@@ -494,7 +494,8 @@ export class CatBrain {
             ])
             .setOutput([ layerSize ])
             .setOptimizeFloatMemory(true)
-            .setTactic("precision"),
+            .setTactic("precision")
+            .setPrecision("single"),
 
             calculateErrors: this.gpu.createKernel(function(
                 nextLayerSize: number,
@@ -511,7 +512,8 @@ export class CatBrain {
             })
             .setOutput([ layerSize ])
             .setOptimizeFloatMemory(true)
-            .setTactic("precision"),
+            .setTactic("precision")
+            .setPrecision("single"),
 
             calculateOutputErrors: this.gpu.createKernel(function(
                 target: Float32Array,
@@ -521,7 +523,8 @@ export class CatBrain {
             })
             .setOutput([ layerSize ])
             .setOptimizeFloatMemory(true)
-            .setTactic("precision"),
+            .setTactic("precision")
+            .setPrecision("single"),
 
             updateWeights: this.gpu.createKernelMap(
                 {
@@ -570,7 +573,8 @@ export class CatBrain {
             }])
             .setOutput([ prevLayerSize, layerSize ])
             .setOptimizeFloatMemory(true)
-            .setTactic("precision"),
+            .setTactic("precision")
+            .setPrecision("single"),
 
             addBiases: this.gpu.createKernel(function(
                 layerBiases: Float32Array,
@@ -582,6 +586,7 @@ export class CatBrain {
             .setOutput([ layerSize ])
             .setOptimizeFloatMemory(true)
             .setTactic("precision")
+            .setPrecision("single")
         }
     }
 
