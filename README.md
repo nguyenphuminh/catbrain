@@ -60,7 +60,7 @@ const neuralNetwork = new CatBrain({
     // biases: ArrayLike<number>[],
     // deltas: ArrayLike<number>[][], // Load this if you want to resume training
 
-    // enableGPU: false, // Whether to use GPU as default for all operations, default is true
+    // enableGPU: false, // Whether to use GPU as default for all operations, default is false
     // gpuOptions: {} // gpu.js options, this will be passed to the GPU constructor
     // Do note that this is heavily in-dev and not recommended for use at all currently
 });
