@@ -12,17 +12,16 @@ const testSet = set.test;
 // Create a CatBrain instance
 const neuralNetwork = new CatBrain({
     layers: [ 784, 256, 256, 256, 10 ], 
-    learningRate: 0.001
+    learningRate: 0.001,
+    // Set this to true if you want GPU
+    enableGPU: false
 });
 
 // Train
 console.log("Training...");
-const enableGPU = false;
 const normalizedSet = normalizeSet(trainingSet);
 const start = performance.now();
-neuralNetwork.train(300000, normalizedSet, {
-    enableGPU
-});
+neuralNetwork.train(1000, normalizedSet);
 console.log(`Training ended in ${performance.now() - start}ms`);
 
 // Calculate accuracy
@@ -57,7 +56,7 @@ function calculateAccuracy(testSet) {
 
         const input = Float32Array.from(testObject.input);
         const expectedOutput = Float32Array.from(testObject.output);
-        const actualOutput = Float32Array.from(neuralNetwork.feedForward(input, { enableGPU }));
+        const actualOutput = Float32Array.from(neuralNetwork.feedForward(input));
 
         let expectedLabel = expectedOutput.indexOf(1);
 
