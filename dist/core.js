@@ -20,6 +20,7 @@ class CatBrain {
     decayRate;
     shuffle;
     gpuOptions;
+    enableGPU;
     // Mostly for internal use
     activationFunc;
     derivativeFunc;
@@ -99,6 +100,7 @@ class CatBrain {
         });
         // GPU configuration
         // Init GPU
+        this.enableGPU = options.enableGPU ?? false;
         this.gpuOptions = options.gpuOptions || {};
         this.gpu = new gpu_js_1.GPU({ ...this.gpuOptions });
         // Init layers' kernels
@@ -112,7 +114,7 @@ class CatBrain {
                                 User APIs
     //////////////////////////////////////////////////////////////*/
     feedForward(inputs, options) {
-        const enableGPU = options?.enableGPU ?? false;
+        const enableGPU = options?.enableGPU ?? this.enableGPU;
         // Feed new inputs to our first (input) layer
         this.layerValues[0] = inputs instanceof Float32Array ? inputs : Float32Array.from(inputs);
         // Propagate layers with layers behind them
@@ -161,7 +163,7 @@ class CatBrain {
         // Init
         const target = targetInput instanceof Float32Array ? targetInput : Float32Array.from(targetInput);
         const output = this.feedForward(inputs, options);
-        const enableGPU = options?.enableGPU ?? false;
+        const enableGPU = options?.enableGPU ?? this.enableGPU;
         const momentum = options?.momentum || this.momentum;
         const dampening = options?.dampening || this.dampening;
         const nesterov = options?.nesterov ?? this.nesterov;
@@ -196,8 +198,6 @@ class CatBrain {
                 this.weights[layer] = result;
                 // Add biases
                 this.biases[layer] = addBiases(layerBiases, learningRate, this.errors[layer]);
-                // this.biases[layer] = Array.from(gpuBiases);
-                // console.log(gpuBiases, this.biases[layer]);
             }
             else {
                 // Calculate errors
@@ -253,7 +253,7 @@ class CatBrain {
             dampening: options?.dampening || this.dampening,
             nesterov: options?.nesterov ?? this.nesterov,
             shuffle: options?.shuffle ?? this.shuffle,
-            enableGPU: options?.enableGPU ?? false
+            enableGPU: options?.enableGPU ?? this.enableGPU
         };
         // Shuffle the dataset first
         if (trainingOptions.shuffle)
@@ -371,7 +371,7 @@ class CatBrain {
         };
     }
     toJSON() {
-        const { layers, weights, biases, deltas, weightInit, activation, outputActivation, leakyReluAlpha, reluClip, momentum, dampening, nesterov, learningRate, decayRate, shuffle, gpuOptions } = this;
+        const { layers, weights, biases, deltas, weightInit, activation, outputActivation, leakyReluAlpha, reluClip, momentum, dampening, nesterov, learningRate, decayRate, shuffle, enableGPU, gpuOptions } = this;
         return JSON.stringify({
             layers,
             weights: weights.map(layerWeights => layerWeights ? layerWeights.map(nodeWeights => Array.from(nodeWeights)) : layerWeights),
@@ -388,6 +388,7 @@ class CatBrain {
             learningRate,
             decayRate,
             shuffle,
+            enableGPU,
             gpuOptions
         });
     }

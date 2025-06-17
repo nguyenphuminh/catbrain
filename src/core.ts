@@ -51,6 +51,7 @@ export interface CatBrainOptions {
     shuffle?: boolean;
 
     // GPU configuration
+    enableGPU: boolean;
     gpuOptions: IGPUSettings;
 }
 
@@ -71,6 +72,7 @@ export class CatBrain {
     public decayRate: number;
     public shuffle: boolean;
     public gpuOptions: IGPUSettings;
+    public enableGPU: boolean;
     
 
     // Mostly for internal use
@@ -175,6 +177,7 @@ export class CatBrain {
         // GPU configuration
 
         // Init GPU
+        this.enableGPU = options.enableGPU ?? false;
         this.gpuOptions = options.gpuOptions || {};
         this.gpu = new GPU({ ...this.gpuOptions });
 
@@ -199,7 +202,7 @@ export class CatBrain {
     //////////////////////////////////////////////////////////////*/
 
     feedForward(inputs: ArrayLike<number>, options?: TrainingOptions): Float32Array {
-        const enableGPU = options?.enableGPU ?? false;
+        const enableGPU = options?.enableGPU ?? this.enableGPU;
 
         // Feed new inputs to our first (input) layer
         this.layerValues[0] = inputs instanceof Float32Array ? inputs : Float32Array.from(inputs);
@@ -267,7 +270,7 @@ export class CatBrain {
         // Init
         const target = targetInput instanceof Float32Array ? targetInput : Float32Array.from(targetInput);
         const output = this.feedForward(inputs, options);
-        const enableGPU = options?.enableGPU ?? false;
+        const enableGPU = options?.enableGPU ?? this.enableGPU;
         const momentum = options?.momentum || this.momentum;
         const dampening = options?.dampening || this.dampening;
         const nesterov = options?.nesterov ?? this.nesterov;
@@ -336,9 +339,6 @@ export class CatBrain {
                     learningRate,
                     this.errors[layer]
                 ) as Float32Array;
-
-                // this.biases[layer] = Array.from(gpuBiases);
-                // console.log(gpuBiases, this.biases[layer]);
             } else {
                 // Calculate errors
                 for (let nodeIndex = 0; nodeIndex < layerSize; nodeIndex++) {
@@ -408,7 +408,7 @@ export class CatBrain {
             dampening: options?.dampening || this.dampening,
             nesterov: options?.nesterov ?? this.nesterov,
             shuffle: options?.shuffle ?? this.shuffle,
-            enableGPU: options?.enableGPU ?? false
+            enableGPU: options?.enableGPU ?? this.enableGPU
         }
 
         // Shuffle the dataset first
@@ -611,6 +611,7 @@ export class CatBrain {
             decayRate,
             shuffle,
 
+            enableGPU,
             gpuOptions
         } = this;
 
@@ -634,6 +635,7 @@ export class CatBrain {
             decayRate,
             shuffle,
 
+            enableGPU,
             gpuOptions
         });
     }

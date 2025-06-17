@@ -39,6 +39,7 @@ export interface CatBrainOptions {
     learningRate?: number;
     decayRate?: number;
     shuffle?: boolean;
+    enableGPU: boolean;
     gpuOptions: IGPUSettings;
 }
 export declare class CatBrain {
@@ -55,6 +56,7 @@ export declare class CatBrain {
     decayRate: number;
     shuffle: boolean;
     gpuOptions: IGPUSettings;
+    enableGPU: boolean;
     activationFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
     derivativeFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;
     outputActivationFunc: (x: number, reluClip: number, leakyReluAlpha: number) => number;

@@ -60,8 +60,8 @@ const neuralNetwork = new CatBrain({
     // biases: ArrayLike<number>[],
     // deltas: ArrayLike<number>[][], // Load this if you want to resume training
 
-    // gpu.js options, this will be passed to the GPU constructor
-    // gpuOptions: {}
+    // enableGPU: false, // Whether to use GPU as default for all operations, default is true
+    // gpuOptions: {} // gpu.js options, this will be passed to the GPU constructor
     // Do note that this is heavily in-dev and not recommended for use at all currently
 });
 
@@ -98,8 +98,10 @@ console.log(neuralNetwork.feedForward([1, 0]));
 // You can run it with GPU enabled:
 // console.log(neuralNetwork.feedForward([1, 0], { enableGPU: true }));
 
-// Export model to JSON
-// console.log(neuralNetwork.toJSON());
+// Export all configurations to JSON
+// const netConfig = neuralNetwork.toJSON();
+// Load the neural net again
+// const net = new Catbrain(JSON.parse(netConfig));
 ```
 
 ## Examples
